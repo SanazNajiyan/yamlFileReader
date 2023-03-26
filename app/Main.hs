@@ -14,8 +14,9 @@ import Test.QuickCheck.Monadic as Q (assert, monadicIO, pick, pre, run)
 import Control.Applicative as AP
 import Control.Monad (replicateM)
 import Data.Yaml.Pretty
-import Data.List (maximumBy)
+import Data.List as L (maximumBy, groupBy, sortOn)
 import Data.Ord (comparing)
+import Debug.Trace
 import Control.Monad as MO (when)
 import qualified Data.Char as C
 import qualified Data.Yaml as Y
@@ -43,14 +44,8 @@ import qualified Data.Map as Map
 
 
 data YamlTree = YamlTree [(String, YamlTree)]
-    deriving (Eq, Show, Generic)
-----not sure if needed!!
--- instance Eq YamlTree where
---     YamlTree [] == YamlTree [] = True
---     YamlTree [(k1, v1)] == YamlTree [(k2, v2)] = k1 == k2 && v1 == v2
---     YamlTree ((k1, v1):rest1) == YamlTree ((k2, v2):rest2) =
---         k1 == k2 && v1 == v2 && YamlTree rest1 == YamlTree rest2
---     _ == _ = False    
+    deriving (Ord, Eq, Show, Generic)
+
 --parse function reads the YAML file using the readYamlFile function from the yaml package and returns a Y.YamlValue representing the parsed YAML content
 --with this implementation only YamlTree [("ExampleKey2",YamlTree [("ExampleKey2",YamlTree []),("ExampleKey2",YamlTree [])])] doesn't work!!!
 parse :: FilePath -> IO Y.YamlValue
@@ -210,20 +205,20 @@ instance Q.Arbitrary YL.Style where
     arbitrary = Q.elements [YL.Plain, YL.SingleQuoted, YL.DoubleQuoted, YL.Literal]      
 -------q4-----------
 --finding the maximum depth of any sub-tree rooted at a value in kvs
-depth :: YamlTree -> Int
-depth (YamlTree []) = 1 -- base case, an empty YamlTree has depth 1
-depth (YamlTree kvs) = 1 + maximum (map (depth . snd) kvs)  
+depthi :: YamlTree -> Int
+depthi (YamlTree []) = 1 -- base case, an empty YamlTree has depth 1
+depthi (YamlTree kvs) = 1 + maximum (map (depthi . snd) kvs)  
 
 minDepth :: YamlTree -> Int
 minDepth (YamlTree []) = 1
-minDepth (YamlTree kvs) = 1 + minimum (map (depth . snd) kvs) 
+minDepth (YamlTree kvs) = 1 + minimum (map (depthi . snd) kvs) 
 ---------q5
 -- | Check whether a given YamlTree is regular
 isRegular :: YamlTree -> Bool
 isRegular (YamlTree []) = True
 isRegular (YamlTree kvs) =
-  let depths = map (depth . snd) kvs
-      isRegularSubtree (_, subtree) = isRegular subtree && depth subtree == maximum depths
+  let depths = map (depthi . snd) kvs
+      isRegularSubtree (_, subtree) = isRegular subtree && depthi subtree == maximum depths
   in all isRegularSubtree kvs
 
 -- | QuickCheck property to test whether a given YamlTree is regular
@@ -233,373 +228,38 @@ prop_isRegular = isRegular
 --Write a function that "regularizes" a YamlTree into a regular one by copying levels in the hierarchy. Please ensure that this function regularizes the YamlTree implemented by "instruments-hierarchy.yaml" to the one implemented by "instruments-hierarchy-regular.yaml". (Again, we want a generally applicable solution. No hard-coding of the example allowed.)
 -- data YamlTree = YamlTree [(String, YamlTree)]
 regularize :: YamlTree -> YamlTree
-regularize yamlTree@(YamlTree treeList) =
-  if isRegular yamlTree then yamlTree else if isRegular yamlTree
-    then yamlTree
-    else YamlTree $ concatMap (regularizeSubTree desiredDepth (map (\(k, v) -> (k, v)) treeList)) trimmedTrees ++ added
-        where
-            subtrees = map snd treeList
-            maxDepth = maximum $ map depth subtrees
-            (trimmedTrees, added) = L.partition (\t -> depth t == maxDepth) subtrees
-            desiredDepth = min (maxDepth + 1) (maximum $ map depth subtrees)
+regularize yamlTree =
+  let maxDepth = depthi yamlTree
+  in if isRegular yamlTree then yamlTree
+     else let newTrees = regularizeSubTree (maxDepth - 1) [(k, v) | (k, v) <- treeToList yamlTree]
+          in YamlTree $ groupTrees newTrees
 
-regularizeSubTree :: Int -> [(String, YamlTree)] -> (String, YamlTree) -> [(String, YamlTree)]
-regularizeSubTree desiredDepth siblings (key, value) =
-  let fullKey = key
-      fullKeyExists (k, _) = k == fullKey
-      depthDiff = maximum [1, desiredDepth - depth value]
-      repeatedValue = generateRepeatedValue depthDiff
-      subTreeList = case L.find fullKeyExists siblings of
-        Just (_, subTree) -> concatMap (\t -> regularizeSubTree (desiredDepth - 1) (map snd (flattenSubTree siblings)) t) (flattenSubTree subTree)
-        Nothing -> [(fullKey, repeatedValue)]
-  in [(fullKey, value)] ++ subTreeList
-
--- flattenSubTree :: [(String, YamlTree)] -> [(String, YamlTree)]
--- flattenSubTree = concatMap flatten
---   where
---     flatten (k, YamlTree kvs) = (k, YamlTree kvs) : flattenSubTree kvs
-flattenSubTree :: YamlTree -> [(String, YamlTree)]
-flattenSubTree (YamlTree treeList) =
-    concatMap flattenSubTree' treeList
-    where
-    flattenSubTree' (key, value) =
-        (key, value) : flattenSubTree value
-
-        
-generateRepeatedValue :: Int -> YamlTree
-generateRepeatedValue depthDiff = YamlTree $ replicate depthDiff ("value", YamlTree [])
-
--- regularize :: YamlTree -> YamlTree
--- regularize yamlTree@(YamlTree treeList) =
---   if isRegular yamlTree
---     then yamlTree
---     else YamlTree $ concatMap (regularizeSubTree desiredDepth treeList trimmedTrees) trimmedTrees ++ added
---   where
---     subtrees = map snd treeList
---     desiredDepth = min (maximum $ map depth subtrees + 1) (maximum $ map depth subtrees)
---     (trimmedTrees, added) = L.partition (\t -> depth t == desiredDepth - 1) treeList
-
--- regularizeSubTree :: Int -> [(String, YamlTree)] -> [(String, YamlTree)] -> (String, YamlTree) -> [(String, YamlTree)]
--- regularizeSubTree desiredDepth siblings trimmedTrees (key, value) =
---   let fullKey = key
---       fullKeyExists (k, _) = k == fullKey
---       depthDiff = maximum [1, desiredDepth - depth value]
---       repeatedValue = generateRepeatedValue depthDiff
---       subTreeList = case L.find fullKeyExists siblings of
---         Just (_, subTree) -> concatMap (regularizeSubTree (desiredDepth - 1) (flattenSubTree siblings) (flattenSubTree trimmedTrees)) (flattenSubTree subTree)
---         Nothing -> [(fullKey, repeatedValue)]
---   in [(fullKey, value)] ++ subTreeList
-
--- flattenSubTree :: [(String, YamlTree)] -> [(String, YamlTree)]
--- flattenSubTree = concatMap flatten
---   where
---     flatten (k, YamlTree kvs) = (k, YamlTree kvs) : flattenSubTree kvs
+regularizeSubTree :: Int -> [(String, YamlTree)] -> [(String, YamlTree)]
+regularizeSubTree depth trees
+  | depth == 0 = trees
+  | otherwise =
+      let subtrees = concatMap (\(_, tree) -> treeToList tree) trees
+          depths = map (depthi . snd) subtrees
+          maxDepth = maximum depths
+          (trimmedTrees, added) = L.partition (\(_, tree) -> depthi tree == maxDepth - 1) subtrees
+          addedAsTuples = map (\t -> ("", t)) added
+      in if null trimmedTrees then []
+         else concatMap (\(k, t) -> map (\(k', t') -> (k ++ "-" ++ k', t')) $ regularizeSubTree (depth - 1) [(k', t') | (k', t') <- treeToList t]) trimmedTrees ++ map snd addedAsTuples
 
 
--- regularizeSubTree :: Int -> [(String, YamlTree)] -> [(String, YamlTree)] -> (String, YamlTree) -> [(String, YamlTree)]
--- regularizeSubTree desiredDepth siblings trimmedTrees (key, value) =
---   let fullKey = key
---       fullKeyExists (k, _) = k == fullKey
---       depthDiff = maximum [1, desiredDepth - depth value]
---       repeatedValue = generateRepeatedValue depthDiff
---       subTreeList = case L.find fullKeyExists siblings of
---         Just (_, subTree) -> concatMap (regularizeSubTree (desiredDepth - 1) (flattenSubTree siblings)) (flattenSubTree subTree)
---         Nothing -> [(fullKey, repeatedValue)]
---   in [(fullKey, value)] ++ subTreeList
-
--- regularizeSubTree :: Int -> [(String, YamlTree)] -> (String, YamlTree) -> [(String, YamlTree)]
--- regularizeSubTree desiredDepth siblings (key, value) =
---   let fullKey = key
---       fullKeyExists (k, _) = k == fullKey
---       depthDiff = max 0 (desiredDepth - depth value)
---       repeatedValue = generateRepeatedValue depthDiff (YamlTree [])
---       subTreeList = case L.find fullKeyExists siblings of
---         Just (_, subTree) -> concatMap (regularizeSubTree (desiredDepth - 1) (flattenSubTree siblings)) (flattenSubTree subTree)
---         Nothing -> [(fullKey, repeatedValue)]
---   in [(fullKey, value)] ++ subTreeList
-
--- flattenSubTree :: [(String, YamlTree)] -> [(String, YamlTree)]
--- flattenSubTree treeList = flattenTreeList treeList []
---   where
---     flattenTreeList [] acc = acc
---     flattenTreeList ((k, YamlTree kvs):rest) acc =
---       flattenTreeList (kvs ++ rest) ((k, YamlTree kvs) : acc)
-
--- generateRepeatedValue :: Int -> YamlTree -> YamlTree
--- generateRepeatedValue depthDiff value = YamlTree $ replicate depthDiff ("value", YamlTree [])
-
--- regularize :: YamlTree -> YamlTree
--- regularize yamlTree@(YamlTree treeList) =
---   if isRegular yamlTree
---     then yamlTree
---     else YamlTree $ concatMap (regularizeSubTree (desiredDepth - 1) treeList) trimmedTrees ++ added
---   where
---     subtrees = map snd treeList
---     maxDepth = maximum $ map depth subtrees
---     (trimmedTrees, added) = L.partition (\t -> depth t == maxDepth) treeList
---     desiredDepth = min (maxDepth + 1) (maximum $ map depth subtrees)
-
--- regularizeSubTree :: Int -> [(String, YamlTree)] -> (String, YamlTree) -> [(String, YamlTree)]
--- regularizeSubTree desiredDepth siblings (key, value) =
---   let fullKey = key
---       fullKeyExists (k, _) = k == fullKey
---       depthDiff = maximum [1, desiredDepth - depth value]
---       repeatedValue = generateRepeatedValue depthDiff
---       subTreeList = case L.find fullKeyExists siblings of
---         Just (_, subTree) -> concatMap (regularizeSubTree (desiredDepth - 1) (flattenSubTree siblings)) (flattenSubTree subTree)
---         Nothing -> [(fullKey, repeatedValue)]
---   in [(fullKey, value)] ++ subTreeList
-
--- flattenSubTree :: [(String, YamlTree)] -> [(String, YamlTree)]
--- flattenSubTree = concatMap flatten
---   where
---     flatten (k, YamlTree kvs) = (k, YamlTree kvs) : flattenSubTree kvs
-
--- generateRepeatedValue :: Int -> YamlTree
--- generateRepeatedValue depthDiff = YamlTree $ replicate depthDiff ("value", YamlTree [])
-
--- regularize :: YamlTree -> YamlTree
--- regularize yamlTree@(YamlTree treeList) =
---   if isRegular yamlTree
---     then yamlTree
---     else YamlTree $ concatMap (regularizeSubTree (desiredDepth - 1)) trimmedTrees ++ added
---   where
---     subtrees = map snd treeList
---     maxDepth = maximum $ map depth subtrees
---     (trimmedTrees, added) = L.partition (\t -> depth t == maxDepth) treeList
---     desiredDepth = min (maxDepth + 1) (maximum $ map depth subtrees)
-
--- regularizeSubTree :: Int -> (String, YamlTree) -> [(String, YamlTree)]
--- regularizeSubTree desiredDepth (key, value) =
---   let fullKey = key
---       fullKeyExists (k, _) = k == fullKey
---       depthDiff = maximum [1, desiredDepth - depth value]
---       repeatedValue = generateRepeatedValue depthDiff
---       subTreeList = case L.find fullKeyExists (flattenSubTree value) of
---         Just (_, subTree) -> concatMap (regularizeSubTree (desiredDepth - 1)) (flattenSubTree subTree)
---         Nothing -> [(fullKey, repeatedValue)]
---   in [(fullKey, value)] ++ subTreeList
-
--- flattenSubTree :: YamlTree -> [(String, YamlTree)]
--- flattenSubTree (YamlTree []) = []
--- flattenSubTree (YamlTree ((key, value):xs)) =
---   (key, value) : flattenSubTree value ++ flattenSubTree (YamlTree xs)
-
--- generateRepeatedValue :: Int -> YamlTree
--- generateRepeatedValue depthDiff = YamlTree $ replicate depthDiff ("value", YamlTree [])
-
--- regularize :: YamlTree -> YamlTree
--- regularize yamlTree@(YamlTree treeList) =
---   if isRegular yamlTree
---     then yamlTree
---     else YamlTree $ concatMap (regularizeSubTree (desiredDepth - 1) treeList) trimmedTrees ++ added
---   where
---     subtrees = map snd treeList
---     maxDepth = maximum $ map depth subtrees
---     (trimmedTrees, added) = L.partition (\(k, t) -> depth t == maxDepth) treeList
---     desiredDepth = min (maxDepth + 1) (maximum $ map depth subtrees)
-
--- regularizeSubTree :: Int -> [(String, YamlTree)] -> (String, YamlTree) -> [(String, YamlTree)]
--- regularizeSubTree desiredDepth treeList (key, value) =
---   let fullKey = key
---       fullKeyExists (k, _) = k == fullKey
---       depthDiff = maximum [1, desiredDepth - depth value]
---       repeatedValue = generateRepeatedValue depthDiff
---       subTreeList = case L.find fullKeyExists (flattenSubTree treeList) of
---         Just (_, subTree) -> concatMap (regularizeSubTree (desiredDepth - 1) (flattenSubTree treeList)) (flattenSubTree subTree)
---         Nothing -> [(fullKey, repeatedValue)]
---   in [(fullKey, value)] ++ subTreeList
-
--- flattenSubTree :: [(String, YamlTree)] -> [(String, YamlTree)]
--- flattenSubTree kvs = concatMap flatten kvs
---   where
---     flatten (k, v) = (k, v) : flattenSubTree (flattenTree v)
---     flattenTree (YamlTree t) = t
-
--- generateRepeatedValue :: Int -> YamlTree
--- generateRepeatedValue depthDiff = YamlTree $ replicate depthDiff ("value", YamlTree [])
-
--- regularize :: YamlTree -> YamlTree
--- regularize yamlTree@(YamlTree treeList) =
---   if isRegular yamlTree
---     then yamlTree
---     else YamlTree $ concatMap (regularizeSubTree (desiredDepth - 1)) trimmedTrees ++ added
---   where
---     subtrees = map snd treeList
---     maxDepth = maximum $ map depth subtrees
---     (trimmedTrees, added) = L.partition (\t -> depth t == maxDepth) treeList
---     desiredDepth = min (maxDepth + 1) (maximum $ map depth subtrees)
-
--- regularizeSubTree :: Int -> (String, YamlTree) -> [(String, YamlTree)]
--- regularizeSubTree desiredDepth (key, value) =
---   let fullKey = key
---       fullKeyExists (k, _) = k == fullKey
---       depthDiff = maximum [1, desiredDepth - depth value]
---       repeatedValue = generateRepeatedValue depthDiff
---       subTreeList = case L.find fullKeyExists (flattenSubTree value) of
---         Just (_, subTree) -> concatMap (regularizeSubTree (desiredDepth - 1)) (flattenSubTree subTree)
---         Nothing -> [(fullKey, repeatedValue)]
---   in [(fullKey, value)] ++ subTreeList
+groupTrees :: [(String, YamlTree)] -> [(String, YamlTree)]
+groupTrees [] = []
+groupTrees xs =
+  let tuples = filter (\(k, _) -> not (null k)) $ map (\(k, v) -> (init k, (last (words k), v))) xs
+      sorted = L.groupBy (\(k1, _) (k2, _) -> head (words k1) == head (words k2)) tuples
+  in map (\trees -> (L.intercalate "/ggggggggg" (map fst trees), YamlTree (map snd trees)))
+         sorted
 
 
 
--- flattenSubTree :: YamlTree -> [(String, YamlTree)]
--- flattenSubTree (YamlTree kvs) = concatMap flatten kvs
---     where
---     flatten (k, v) = (k, v) : flattenSubTree v
 
--- generateRepeatedValue :: Int -> YamlTree
--- generateRepeatedValue depthDiff = YamlTree $ replicate depthDiff ("value", YamlTree [])
-
-
-
--- regularizeYamlTree :: YamlTree -> YamlTree
--- regularizeYamlTree yamlTree@(YamlTree treeList) =
---   if isRegular yamlTree then yamlTree
---   else YamlTree $ concatMap (regularizeSubTree "") treeList
---   where
---     regularizeSubTree :: String -> (String, YamlTree) -> [(String, YamlTree)]
---     regularizeSubTree prefix (key, value) =
---       let fullKey = prefix ++ key
---           fullKeyExists (k, _) = k == fullKey
---           depthDiff = maximum [1, desiredDepth - depth value]
---           repeatedValue = generateRepeatedValue depthDiff
---           subTreeList = case L.find fullKeyExists treeList of
---             Just (_, subTree) -> concatMap (regularizeSubTree $ fullKey ++ "....") (flattenSubTree subTree)
---             Nothing -> [(fullKey, repeatedValue)]
---       in [(fullKey, value)] ++ subTreeList
---     desiredDepth = maximum $ map (depth . snd) treeList
---     flattenSubTree :: YamlTree -> [(String, YamlTree)]
---     flattenSubTree (YamlTree kvs) = concatMap flatten kvs
---       where
---         flatten (k, v) = (k, v) : flattenSubTree v
-
--- regularizeYamlTree :: YamlTree -> YamlTree
--- regularizeYamlTree yamlTree@(YamlTree treeList) =
---   if isRegular yamlTree then yamlTree
---   else YamlTree $ concatMap (regularizeSubTree "") treeList
---   where
---     regularizeSubTree :: String -> (String, YamlTree) -> [(String, YamlTree)]
---     regularizeSubTree prefix (key, value) =
---       let fullKey = prefix ++ key
---           fullKeyExists (k, _) = k == fullKey
---           depthDiff = maximum [1, desiredDepth - depth value]
---           repeatedValue = generateRepeatedValue depthDiff
---           subTreeList = case L.find fullKeyExists treeList of
---             Just (_, subTree) -> concatMap (regularizeSubTree $ fullKey ++ "..") (flattenSubTree subTree)
---             Nothing -> [("value", repeatedValue)]
---       in [(fullKey, value)] ++ subTreeList
---     desiredDepth = maximum $ map (depth . snd) treeList
--- flattenSubTree :: YamlTree -> [(String, YamlTree)]
--- flattenSubTree (YamlTree kvs) = concatMap flatten kvs
---     where
---     flatten (k, v) = (k, v) : flattenSubTree v
-
--- regularizeYamlTree :: YamlTree -> YamlTree
--- regularizeYamlTree yamlTree@(YamlTree treeList) =
---   if isRegular yamlTree then yamlTree
---   else YamlTree $ concatMap (regularizeSubTree "") treeList
---   where
---     regularizeSubTree :: String -> (String, YamlTree) -> [(String, YamlTree)]
---     regularizeSubTree prefix (key, value) =
---       let fullKey = prefix ++ key
---           fullKeyExists (k, _) = k == fullKey
---           depthDiff = maximum [1, desiredDepth - depth value]
---           repeatedValue = YamlTree $ replicate depthDiff ("value", YamlTree [])
---           subTreeList = case L.find fullKeyExists treeList of
---             Just (_, subTree) -> concatMap (regularizeSubTree $ fullKey ++ ".") (flattenSubTree subTree)
---             Nothing -> [("value", repeatedValue)]
---       in [(fullKey, value)] ++ subTreeList
---     desiredDepth = maximum $ map (depth . snd) treeList
--- flattenSubTree :: YamlTree -> [(String, YamlTree)]
--- flattenSubTree (YamlTree kvs) = concatMap flatten kvs
---     where
---     flatten (k, v) = (k, v) : flattenSubTree v
-   
-
--- regularizeYamlTree :: YamlTree -> YamlTree
--- regularizeYamlTree yamlTree@(YamlTree treeList) =
---   if isRegular yamlTree then yamlTree
---   else YamlTree $ concatMap (regularizeSubTree "") treeList
-
--- regularizeSubTree :: String -> YamlTree -> [(String, YamlTree)]
--- regularizeSubTree prefix yamlSubTree@(YamlTree []) = [(prefix, yamlSubTree)]
--- regularizeSubTree prefix yamlSubTree@(YamlTree subTreeList) =
---     let maxDepth = maximum $ map (getDepth . snd) subTreeList
---         repeatValues = repeatValueToDepth maxDepth
---     in if isRegular yamlSubTree
---         then [(prefix, yamlSubTree)]
---         else (prefix, yamlSubTree) : concatMap (regularizeSubTree' repeatValues) subTreeList
---     where
---         regularizeSubTree' :: [String] -> (String, YamlTree) -> [(String, YamlTree)]
---         regularizeSubTree' repeatValues (key, value) =
---             let newPrefix = prefix ++ "." ++ key
---             in case lookup key subTreeList of
---                     Nothing -> regularizeSubTree newPrefix value
---                     Just subTree -> [(newPrefix ++ "." ++ rKey, rValue) | (rKey, rValue) <- regularizeSubTree newPrefix subTree]
-  
-
--- regularizeYamlTree :: YamlTree -> YamlTree
--- regularizeYamlTree yamlTree@(YamlTree treeList) =
---   if isRegular yamlTree then yamlTree 
---   else YamlTree $ concatMap (regularizeSubTree "") treeList
---   where
---     regularizeSubTree :: String -> (String, YamlTree) -> [(String, YamlTree)]
---     regularizeSubTree prefix (key, subTree@(YamlTree subTreeList)) =
---       let newPrefix = if null prefix then key else prefix ++ "." ++ key
---       in if isRegular subTree
---          then [(newPrefix, subTree)]
---          else (newPrefix, subTree) : concatMap (regularizeSubTree newPrefix) subTreeList
--- regularizeYamlTree :: YamlTree -> YamlTree
--- regularizeYamlTree yamlTree@(YamlTree treeList) = 
---   if isRegular yamlTree then yamlTree 
---   else YamlTree $ map (\(k, v) -> (k, regularizeSubTree v)) treeList
---   where
---     regularizeSubTree :: YamlTree -> YamlTree
---     regularizeSubTree yamlSubTree@(YamlTree []) = yamlSubTree
---     regularizeSubTree yamlSubTree@(YamlTree subTreeList) = 
---       if isRegular yamlSubTree then yamlSubTree
---       else YamlTree [(key, regularizeSubTree value) | (key, value) <- subTreeList] 
-
--- regularizeYamlTree :: YamlTree -> YamlTree
--- regularizeYamlTree (YamlTree treeList) = YamlTree $ map (\(k, v) -> (k, regularizeSubTree v)) treeList
---   where
---     regularizeSubTree :: YamlTree -> YamlTree
---     regularizeSubTree (YamlTree []) = YamlTree []
---     regularizeSubTree (YamlTree subTreeList) = YamlTree [(key ++ "aaaaaa", regularizeSubTree value) | (key, value) <- subTreeList] 
-
--- regularize :: YamlTree -> YamlTree
--- regularize yt = regularize' yt (depth yt)
--- regularizeYamlTree :: YamlTree -> YamlTree
--- regularizeYamlTree (YamlTree []) = YamlTree []
--- regularizeYamlTree (YamlTree xs) = YamlTree (concatMap copyLevels xs)
---   where
---     copyLevels :: (String, YamlTree) -> [(String, YamlTree)]
---     copyLevels (name, tree@(YamlTree children)) =
---       case children of
---         [] -> [(name, tree)]
---         _  -> [(name, subtree) | (childName, childTree) <- children,
---                                  subtree <- regularizeSubtree childName childTree]
-    
-
--- regularizeYamlTree :: Int -> YamlTree -> YamlTree
--- regularizeYamlTree depth (YamlTree items) =
---   if depth == 0
---     then YamlTree []
---     else YamlTree $ map (\(key, value) -> (key, regularizeYamlTree (depth - 1) value)) items
--- | Regularize a YamlTree by copying levels until the desired depth is reached
--- regularizeYamlTree :: Int -> YamlTree -> YamlTree
--- regularizeYamlTree depth (YamlTree items) =
---   if depth == 0
---     then YamlTree []
---     else YamlTree $ map (\(key, value) -> (key, regularizeYamlTree (depth - 1) value)) items
-
--- regularizeSubtree :: String -> YamlTree -> [YamlTree]
--- regularizeSubtree name (YamlTree children) =
---     case children of
---     [] -> [YamlTree [(name, YamlTree [])]]
---     _  -> [YamlTree [(name, subtree)] | (childName, childTree) <- children,
---                                         subtree <- regularizeSubtree childName childTree]
+treeToList :: YamlTree -> [(String, YamlTree)]
+treeToList (YamlTree trees) = trees
 
 ---------------------------------------------------------------------------------
 main :: IO ()
@@ -616,7 +276,7 @@ main = do
     --print (prop_isRegular yamlTree) --works fine
     putStrLn (show $ regularized == yamlTree2)
     print regularized
-    print (depth yamlTree) 
+    print (depthi yamlTree) 
     print (isRegular yamlTree2)
     yamlTreeToYamlFile "output2.yaml" regularized
     print (isRegular regularized)

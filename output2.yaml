@@ -1,4 +1,4 @@
- bonds:
+long-bond:
   long-bonds:
     us-long-bonds:
         US10
@@ -8,6 +8,7 @@
     eu-short-bonds:
         OAT
         BTP
+short-bond:
   short-bonds:
     us-short-bonds:
         US2
@@ -17,47 +18,5 @@
         SHATZ
         BTP3
     KR3
-  STIRs:
-      EURIBOR
-      FED
-value:
-  value
- energies:
-  oil:
-      CRUDE_W_mini
-      BRENT-LAST
-      HEATOIL
-      GASOILINE
-  gas:
-      GAS_US_mini
-      GAS-LAST
-value:
-  value
- currencies:
-  usd-fx:
-      INR-SGX
-      EUR
-      GBP
-  eur-fx:
-      EUR
-      EURGBP
-value:
-  value
- equities:
-  us-equities:
-      SP500_mini
-      R1000
-  eu-equities:
-      AEX
-      DAX
-  asia-equities:
-    KOSPI
-value:
-  value
- vol:
-    VIX
-    V2X
-    VNKI
-value:
-  value
-  value
+VIX V2X VNK:
+  VNKI
