@@ -36,6 +36,7 @@ executable yamltree
                       bytestring, 
                       text,
                       QuickCheck,
-                      libyaml
+                      libyaml,
+                      split
     hs-source-dirs:   app
     default-language: Haskell2010
