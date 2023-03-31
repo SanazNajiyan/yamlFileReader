@@ -10,7 +10,7 @@ bonds:
             BTP
     short-bonds:
         us-short-bonds:
-            US2 
+            US2
             US3
             US5
         eu-short-bonds:
@@ -22,7 +22,7 @@ bonds:
         FED
 energies:
     oil:
-        CRUDE_W_mini 
+        CRUDE_W_mini
         BRENT-LAST
         HEATOIL
         GASOILINE

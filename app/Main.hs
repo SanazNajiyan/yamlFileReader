@@ -41,6 +41,7 @@ import GHC.Generics
 import qualified Data.Map.Strict as Map
 import qualified Data.Map as Map
 
+import Debug.Trace (trace)
 --We (recursively) call a YamlTree regular if all of its (proper) subtrees have the same depth and are regular themselves. Please implement a QuickCheck test that checks whether a YamlTree is regular.
 
 
@@ -49,28 +50,32 @@ data YamlTree = YamlTree [(String, YamlTree)]
 
 --parse function reads the YAML file using the readYamlFile function from the yaml package and returns a Y.YamlValue representing the parsed YAML content
 --with this implementation only YamlTree [("ExampleKey2",YamlTree [("ExampleKey2",YamlTree []),("ExampleKey2",YamlTree [])])] doesn't work!!!
+--comment!!why you did it like that?
 parse :: FilePath -> IO Y.YamlValue
 parse path = do
   content <- BS.readFile path
   if BS.null content
     then return (Y.Mapping [] Nothing)
-  else if (BS.strip content == BS.pack ":") 
+  else if (BS.strip content == BS.pack ":")
     then return (Y.Mapping [(T.empty, Y.Mapping [] Nothing)] Nothing)
   --else if ((last (BS.strip content)) == BS.pack ":")
-  else if (BS.isSuffixOf (BS.pack ":") (BS.strip content))  
+  else if (BS.isSuffixOf (BS.pack ":") (BS.strip content))
     then return $ Y.Mapping [( TE.decodeUtf8 $ BS.init (BS.strip content), Y.Mapping [] Nothing)] Nothing
   else Y.readYamlFile path
 
 
 
 -- parse :: FilePath -> IO Y.YamlValue
--- parse = Y.readYamlFile 
+-- parse = Y.readYamlFile
 
 convertToYAMLTree :: Y.YamlValue -> YamlTree
 convertToYAMLTree (Y.Mapping list _) = YamlTree (L.map (\(xs,ys) -> (T.unpack xs, convertToYAMLTree ys)) list)
-convertToYAMLTree (Y.Scalar xs _ _ _) = YamlTree [(BS.unpack xs, YamlTree [])] --when we reach a Leaf
---convertToYAMLTree (Y.Sequence list _) = YamlTree $ L.map (\x -> ("-", convertToYAMLTree x)) $ V.toList $ V.fromList list --In this implementation the list argument is first converted to a Vector using V.fromList, and then V.toList is used to convert the Vector to a list.
-convertToYAMLTree _ = YamlTree []
+convertToYAMLTree (Y.Scalar xs _ _ _) = if BS.unpack xs == ""
+  -- TODO: comment explaining why this is neccessary (otherwise we get empty nested values)
+  then YamlTree []
+  else YamlTree [(BS.unpack xs, YamlTree [])] --when we reach a Leaf
+convertToYAMLTree (Y.Sequence list _) = error "Yaml lists are not supported" --YamlTree $ L.map (\x -> ("-", convertToYAMLTree x)) $ V.toList $ V.fromList list --In this implementation the list argument is first converted to a Vector using V.fromList, and then V.toList is used to convert the Vector to a list.
+convertToYAMLTree (Y.Alias _) = error "Aliasses are not supported"
 
 yamlTreeToYamlFile :: FilePath -> YamlTree -> IO ()
 yamlTreeToYamlFile filePath tree = do
@@ -82,6 +87,7 @@ indent :: Int -> String -> String
 indent n line
   | null line = ""
   | otherwise = replicate n ' ' ++ line ++ "\n"
+
 yamlTreeToStringIndented :: Int -> YamlTree -> String
 yamlTreeToStringIndented _ (YamlTree []) = ""
 yamlTreeToStringIndented indentLevel (YamlTree ((key, value):rest)) =
@@ -92,11 +98,11 @@ yamlTreeToStringIndented indentLevel (YamlTree ((key, value):rest)) =
         indentedSubtreeText = if null valueText then "" else valueText
         valueText = if isStringWithSpaces key
                         then  L.intercalate "" $ map (indent $ (indentLevel + 1) * 2) (words key)
-                        else yamlTreeToStringIndented (indentLevel + 1) value 
+                        else yamlTreeToStringIndented (indentLevel + 1) value
 
 isStringWithSpaces :: String -> Bool
 isStringWithSpaces s = ' ' `elem` s
---pretty printer for YamlTrees that generates a .yaml-file again from your hierarchy  
+--pretty printer for YamlTrees that generates a .yaml-file again from your hierarchy
 yamlTreeToString :: YamlTree -> String
 yamlTreeToString (YamlTree []) = ""
 yamlTreeToString (YamlTree ((key, value):rest)) =
@@ -118,8 +124,11 @@ prop_my_io_action yamltree =
     yamlValue <- run $ parse fileName
     let result = convertToYAMLTree yamlValue
     Q.assert (result == yamltree)
-
---The instance FromJSON Y.YamlValue is defined simply as parseJSON = parseJSON, which means that it will use the default implementation of parseJSON provided by FromJSON. Since YamlValue is already an instance of FromJSON, this is sufficient to define the instance.
+--rewrap extension- altq
+--The instance FromJSON Y.YamlValue is defined simply as parseJSON = parseJSON,
+--which means that it will use the default implementation of parseJSON provided
+--by FromJSON. Since YamlValue is already an instance of FromJSON, this is
+--sufficient to define the instance.
 instance FromJSON Y.YamlValue where
     parseJSON = parseJSON
 
@@ -147,7 +156,7 @@ arbitraryYamlTree n = do
             --key <- Q.listOf $ Q.elements validChars
             return $ if null key then "default_key" else key
 
--------------nr.2 choice with reasonable maxKeyLength and levels---------    
+-------------nr.2 choice with reasonable maxKeyLength and levels---------
 -- instance Q.Arbitrary YamlTree where
 --     arbitrary = Q.sized (arbitraryYamlTree 5)
     
@@ -176,20 +185,20 @@ mergeTuples :: [(String, YamlTree)] -> [(String, YamlTree)]
 mergeTuples [] = []
 mergeTuples ((key1, YamlTree []):(key2, YamlTree []):rest) = mergeTuples ((key1 ++ " " ++ key2, YamlTree []) : rest)
 mergeTuples (kv:rest) = kv : mergeTuples rest
-
+-----------NO this is not needed!!!
 instance Arbitrary Y.YamlValue where
     arbitrary = Q.oneof [arbitraryMapping, arbitraryScalar]
     
 arbitraryMapping :: Gen Y.YamlValue
 arbitraryMapping = Y.Mapping <$> arbitraryKeyVals <*> pure Nothing
-    where 
+    where
         arbitraryKeyVals = Q.listOf1 arbitraryKV
         arbitraryKV = (,) <$> arbitraryText <*> arbitrary
 arbitraryScalar :: Q.Gen Y.YamlValue
-arbitraryScalar = Y.Scalar 
-    <$> arbitraryByteString 
-    <*> arbitraryTag 
-    <*> arbitraryStyle 
+arbitraryScalar = Y.Scalar
+    <$> arbitraryByteString
+    <*> arbitraryTag
+    <*> arbitraryStyle
     <*> pure Nothing
     where
         arbitraryByteString = TE.encodeUtf8 . T.pack <$> Q.listOf1 arbitraryChar
@@ -203,16 +212,16 @@ arbitraryChar :: Q.Gen Char
 arbitraryChar = Q.elements (['a'..'z'] ++ ['A'..'Z'] ++ ['0'..'9'])
 
 instance Q.Arbitrary YL.Style where
-    arbitrary = Q.elements [YL.Plain, YL.SingleQuoted, YL.DoubleQuoted, YL.Literal]      
+    arbitrary = Q.elements [YL.Plain, YL.SingleQuoted, YL.DoubleQuoted, YL.Literal]
 -------q4-----------
 --finding the maximum depth of any sub-tree rooted at a value in kvs
 depthi :: YamlTree -> Int
 depthi (YamlTree []) = 1 -- base case, an empty YamlTree has depth 1
-depthi (YamlTree kvs) = 1 + maximum (map (depthi . snd) kvs)  
+depthi (YamlTree kvs) = 1 + maximum (map (depthi . snd) kvs)
 
 minDepth :: YamlTree -> Int
 minDepth (YamlTree []) = 1
-minDepth (YamlTree kvs) = 1 + minimum (map (depthi . snd) kvs) 
+minDepth (YamlTree kvs) = 1 + minimum (map (depthi . snd) kvs)
 ---------q5
 -- | Check whether a given YamlTree is regular
 isRegular :: YamlTree -> Bool
@@ -228,62 +237,31 @@ prop_isRegular = isRegular
 -----------q6
 --Write a function that "regularizes" a YamlTree into a regular one by copying levels in the hierarchy. Please ensure that this function regularizes the YamlTree implemented by "instruments-hierarchy.yaml" to the one implemented by "instruments-hierarchy-regular.yaml". (Again, we want a generally applicable solution. No hard-coding of the example allowed.)
 -- data YamlTree = YamlTree [(String, YamlTree)]
--- regularize :: YamlTree -> YamlTree
--- regularize yamlTree =
---   let maxDepth = depthi yamlTree
---   in if isRegular yamlTree then yamlTree
---      else let newTrees = regularizeSubTree (maxDepth - 1) [(k, v) | (k, v) <- treeToList yamlTree]
---           in YamlTree $ groupTrees newTrees
--- regularizeSubTree :: Int -> [(String, YamlTree)] -> [(String, YamlTree)]
--- regularizeSubTree depth trees
---     | depth == 0 = trees
---     | otherwise =
---         let subtrees = concatMap (\(_, tree) -> treeToList tree) trees
---             depths = map (depthi . snd) subtrees
---             maxDepth = maximum depths
---             (okTrees, addToThisTree) = L.partition (\(_, tree) -> depthi tree == maxDepth - 1) subtrees
---             addedAsTuples = map (\t -> (" ", t)) addToThisTree
---         in concatMap (\(k, t) -> map (\(k', t') -> (k ++ "/" ++ k', t')) $ regularizeSubTree (depth - 1) [(k', t') | (k', t') <- treeToList t]) okTrees ++ map snd addedAsTuples
-    -----------------------above version has output but not juist!      
--- data YamlTree = YamlTree [(String, YamlTree)]
 regularize :: YamlTree -> YamlTree
-regularize yamlTree =
+regularize yamlTree@(YamlTree subTrees) =
   let maxDepth = depthi yamlTree
-  in if isRegular yamlTree then yamlTree
-     else let newTrees = regularizeSubTree (maxDepth - 1) [(" ", yamlTree)]
-          in YamlTree $ groupTrees newTrees
+      newTrees = regularizeSubTrees maxDepth subTrees
+  in YamlTree newTrees
 
-regularizeSubTree :: Int -> [(String, YamlTree)] -> [(String, YamlTree)]
-regularizeSubTree depth trees
-    | depth == 0 = trees   -- base case, return the current level of trees
-    | otherwise =
-        let subtrees = concatMap (\(_, tree) -> treeToList tree) trees   -- get all the subtrees of the current level of trees
-            depths = map (depthi . snd) subtrees    -- get the depths of all the subtrees
-            maxDepth = maximum depths   -- find the maximum depth among the subtrees
-            okTrees = filter (\(_, tree) -> depthi tree == maxDepth - 1) subtrees   -- filter the subtrees that have a depth of `maxDepth - 1`
-            addedAsTuples = map (\t -> ("", snd t)) $ filter (\(_, tree) -> depthi tree == maxDepth) subtrees   -- get the subtrees that have a depth of `maxDepth`, and add them to the tree hierarchy as a new level
-        in concatMap (\(k, t) -> map (\(k', t') -> (k ++ "/" ++ k', t')) $ regularizeSubTree (depth - 1) (treeToList t)) okTrees ++ map (\(k, t) -> (k ++ "/", t)) addedAsTuples
-groupTrees :: [(String, YamlTree)] -> [(String, YamlTree)]
-groupTrees [] = []
-groupTrees xs =
-  let tuples = filter (\(k, _) -> not (null k)) $ map (\(k, v) -> (init k, (last (words k), v))) xs
-      sorted = L.groupBy (\(k1, _) (k2, _) -> head (words k1) == head (words k2)) tuples
-  in map (\trees -> (L.intercalate "///////" (map fst trees), YamlTree (map snd trees)))
-         sorted
---groupTrees because it is responsible for organizing the list of tuples that regularizeSubTree returns into a hierarchical structure with nested YamlTree values.
--- groupTrees :: [(String, YamlTree)] -> [(String, YamlTree)]
--- groupTrees [] = []
--- groupTrees xs =
---   let (heads, tails) = L.partition (null . tail . splitOn "/") xs
---       grouped = map (\ys -> (head $ splitOn "/" $ fst $ head ys, YamlTree $ groupTrees $ map (\(k, v) -> (unsplit $ tail $ splitOn "/" k, v)) ys)) $ L.groupBy (\x y -> head (splitOn "/" $ fst x) == head (splitOn "/" $ fst y)) heads
---   in grouped ++ groupTrees (map (\(k, v) -> (unsplit $ tail $ splitOn "/" k, v)) tails)
+regularizeSubTrees :: Int -> [(String, YamlTree)] -> [(String, YamlTree)]
+regularizeSubTrees 0 [] = []
+regularizeSubTrees 0 _  = error "Cannot shrink tree"
+regularizeSubTrees depth trees = let x = map (regularizeSubTree (depth -1)) trees
+  in trace (show x) x
+            --we compare the inner yamlTreewith desired depth we want
 
---make sure the tuple (trimmed) work!!!
-
-
+regularizeSubTree :: Int ->(String, YamlTree) -> (String, YamlTree)
+regularizeSubTree depth a@(key, val) =
+    let (key', YamlTree val') = if depthi val /= depth then addLevel (depth - depthi val) (key, val)
+                                     else a-- make if part a binding andcall it inregularizeSubTrees
+    in (key', YamlTree (regularizeSubTrees depth val'))
+addLevel :: Int ->(String, YamlTree) -> (String, YamlTree)
+addLevel 0 tuple = tuple
+addLevel i (key, val) = addLevel (i-1) (key , YamlTree [(key, val)])
 treeToList :: YamlTree -> [(String, YamlTree)]
 treeToList (YamlTree trees) = trees
 
+-- YamlTree [("bonds",YamlTree [("long-bonds",YamlTree [("us-long-bonds",YamlTree [("US10",YamlTree []), ("US20", YamlTree []), ("US30", YamlTree [])]),("KR10",YamlTree [("",YamlTree [])]),("eu-short-bonds",YamlTree [("OAT BTP",YamlTree [])])]),("short-bonds",YamlTree [("us-short-bonds",YamlTree [("US2 US3 US5",YamlTree [])]),("eu-short-bonds",YamlTree [("SHATZ BTP3",YamlTree [])]),("KR3",YamlTree [("",YamlTree [])])]),("STIRs",YamlTree [("EURIBOR FED",YamlTree [])])]),("energies",YamlTree [("oil",YamlTree [("CRUDE_W_mini BRENT-LAST HEATOIL GASOILINE",YamlTree [])]),("gas",YamlTree [("GAS_US_mini GAS-LAST",YamlTree [])])]),("currencies",YamlTree [("usd-fx",YamlTree [("INR-SGX EUR GBP",YamlTree [])]),("eur-fx",YamlTree [("EUR EURGBP",YamlTree [])])]),("equities",YamlTree [("us-equities",YamlTree [("SP500_mini R1000",YamlTree [])]),("eu-equities",YamlTree [("AEX DAX",YamlTree [])]),("asia-equities",YamlTree [("KOSPI",YamlTree [])])]),("vol",YamlTree [("VIX V2X VNKI",YamlTree [])])]
 ---------------------------------------------------------------------------------
 main :: IO ()
 main = do
@@ -292,28 +270,30 @@ main = do
     -- let regularized = regularize input
     -- putStrLn (show $ regularized == output)
     yamlValue <- parse "instruments-hierarchy.yaml"
+    print yamlValue
     let yamlTree = convertToYAMLTree yamlValue
+    print yamlTree
     let regularized = regularize yamlTree
-    yamlValue2 <- parse "instruments-hierarchy-regular.yaml"
-    let yamlTree2 = convertToYAMLTree yamlValue2
-    -- --print (prop_isRegular yamlTree) --works fine
-    putStrLn (show $ regularized == yamlTree2)
+    -- -- yamlValue2 <- parse "instruments-hierarchy-regular.yaml"
+    -- -- let yamlTree2 = convertToYAMLTree yamlValue2
+    -- -- -- --print (prop_isRegular yamlTree) --works fine
+    -- -- putStrLn (show $ regularized == yamlTree2)
     print regularized
-    print (depthi yamlTree) 
-    print (isRegular yamlTree2)
-    yamlTreeToYamlFile "output2.yaml" regularized
-    print (isRegular regularized)
+    -- -- print (depthi yamlTree)
+    -- -- print (isRegular yamlTree2)
+    yamlTreeToYamlFile "output1.yaml" regularized
+    -- print (isRegular regularized)
     ----------------------testing partition---------not working []---
     -- let testInput = [("bonds",YamlTree [("long-bonds",YamlTree [("us-long-bonds",YamlTree [("US10 US20 US30",YamlTree [])]),("KR10",YamlTree [("KR10",YamlTree [])]),("eu-short-bonds",YamlTree [("OAT BTP",YamlTree [])])]),("short-bonds",YamlTree [("us-short-bonds",YamlTree [("US2 US3 US5",YamlTree [])]),("eu-short-bonds",YamlTree [("SHATZ BTP3",YamlTree [])]),("KR3",YamlTree [("KR3",YamlTree [])])]),("STIRs",YamlTree [("STIRs",YamlTree [("EURIBOR FED",YamlTree [])])])]),("energies",YamlTree [("energies",YamlTree [("oil",YamlTree [("CRUDE_W_mini BRENT-LAST HEATOIL GASOILINE",YamlTree [])]),("gas",YamlTree [("GAS_US_mini GAS-LAST",YamlTree [])])])]),("currencies",YamlTree [("currencies",YamlTree [("usd-fx",YamlTree [("INR-SGX EUR GBP",YamlTree [])]),("eur-fx",YamlTree [("EUR EURGBP",YamlTree [])])])]),("equities",YamlTree [("equities",YamlTree [("us-equities",YamlTree [("SP500_mini R1000",YamlTree [])]),("eu-equities",YamlTree [("AEX DAX",YamlTree [])]),("asia-equities",YamlTree [("KOSPI",YamlTree [])])])]),("vol",YamlTree [("vol",YamlTree [("vol",YamlTree [("VIX V2X VNKI",YamlTree [])])])])]
     -- let subtrees = concatMap (\(_, tree) -> treeToList tree) testInput
     -- let okTrees = L.filter (\(_, tree) -> depthi tree == 4) subtrees
     -- print okTrees
 --------------------------------
-    let yamlTree = YamlTree [("a", YamlTree [("b", YamlTree [("c", YamlTree []), ("d", YamlTree [])]), ("e", YamlTree [])]), ("f", YamlTree [])]
-    yamlTreeToYamlFile "output.yaml" yamlTree
-    let regularizedTree = regularizeSubTree 2 [(" ", yamlTree)]
-    yamlTreeToYamlFile "output1.yaml" (YamlTree $ regularizedTree)
-    print regularizedTree
+    -- let yamlTree = YamlTree [("a", YamlTree [("b", YamlTree [("c", YamlTree []), ("d", YamlTree [])]), ("e", YamlTree [])]), ("f", YamlTree [])]
+    -- yamlTreeToYamlFile "output.yaml" yamlTree
+    -- let regularizedTree = regularizeSubTree 2 [(" ", yamlTree)]
+    -- yamlTreeToYamlFile "output1.yaml" (YamlTree $ regularizedTree)
+    -- print regularizedTree
 
 
 
@@ -321,7 +301,7 @@ main = do
     -- putStrLn "Input:"
     -- let testInput = YamlTree [("", YamlTree [])] --this passed even with "aa"
     -- let testInput = YamlTree [("bonds",YamlTree [("long-bonds",YamlTree [("us-long-bonds",YamlTree [("US10 US20 US30",YamlTree [])]),("KR10",YamlTree [("KR10",YamlTree [])]),("eu-short-bonds",YamlTree [("OAT BTP",YamlTree [])])]),("short-bonds",YamlTree [("us-short-bonds",YamlTree [("US2 US3 US5",YamlTree [])]),("eu-short-bonds",YamlTree [("SHATZ BTP3",YamlTree [])]),("KR3",YamlTree [("KR3",YamlTree [])])]),("STIRs",YamlTree [("STIRs",YamlTree [("EURIBOR FED",YamlTree [])])])]),("energies",YamlTree [("energies",YamlTree [("oil",YamlTree [("CRUDE_W_mini BRENT-LAST HEATOIL GASOILINE",YamlTree [])]),("gas",YamlTree [("GAS_US_mini GAS-LAST",YamlTree [])])])]),("currencies",YamlTree [("currencies",YamlTree [("usd-fx",YamlTree [("INR-SGX EUR GBP",YamlTree [])]),("eur-fx",YamlTree [("EUR EURGBP",YamlTree [])])])]),("equities",YamlTree [("equities",YamlTree [("us-equities",YamlTree [("SP500_mini R1000",YamlTree [])]),("eu-equities",YamlTree [("AEX DAX",YamlTree [])]),("asia-equities",YamlTree [("KOSPI",YamlTree [])])])]),("vol",YamlTree [("vol",YamlTree [("vol",YamlTree [("VIX V2X VNKI",YamlTree [])])])])]
-    -- let regularized = regularize testInput 
+    -- let regularized = regularize testInput
     -- print (regularized == YamlTree [("", YamlTree [])])
     -- putStrLn "Expected output:"
     -- print output
@@ -342,7 +322,7 @@ main = do
     
      --print $ yamlTreeToString (YamlTree [("gg", YamlTree [])])
     -- print $ convertToYAMLTree (":\n")
-    -- yamlTreeToYamlFile "output2.yaml" $ YamlTree [("ExampleKey2",YamlTree [("ExampleKey2",YamlTree []),("ExampleKey2",YamlTree [])])] 
+    -- yamlTreeToYamlFile "output2.yaml" $ YamlTree [("ExampleKey2",YamlTree [("ExampleKey2",YamlTree []),("ExampleKey2",YamlTree [])])]
     -- yamlValue <- parse "output2.yaml"
     -- print yamlValue
     --print $ convertToYAMLTree yamlValue
@@ -382,10 +362,10 @@ main = do
     -- yamlTreeToYamlFile "output.yaml" yamlTree
     -- --writeFile "output.yaml" (yamlTreeToTextIndented tree)
 
---arbitrary so that it never generates "" string. 
+--arbitrary so that it never generates "" string.
 --I need to handle empty yaml file . can not be parsed ?
 --make a simplist yamlTree with text
---pretty prineter should 
+--pretty prineter should
 --try to replace the element of the tree to that generator
 --arbitrary should parse your specific tree
 --then make it general . using generator funciton like listOf
@@ -401,16 +381,16 @@ main = do
     -- y1 <- Q.generate arbitrary :: IO YamlTree
     -- y2 <- Q.generate arbitrary :: IO YamlTree
     -- putStrLn $ show y1
-    -- putStrLn $ show y2    
+    -- putStrLn $ show y2
 --SOALLLLLLA:problems: sanaz -> sanaz: in yaml file , seeing the result of prop not possible, asking about the YamlTree definition, YamlTree[YamlTree]??line 19 hierarchy.yaml        KR3:
---SOALLLLA: decodeFileThrow why doesn't respond
+--SOALLLLA: decodeFileThrow why doesn't respond-yaml file weird. not ideal structure. leaf missing, to regularize it is very inherent of . not how yaml works
 -- testi :: Int -> [(String, YamlTree)] -> [(String, YamlTree)]
--- testi depth trees 
+-- testi depth trees
 --   | depth == 0 = trees
 --   | otherwise =
 --     let subtrees = concatMap (\(_, tree) -> treeToList tree) trees
 --         depths = map (depthi . snd) subtrees
 --         maxDepth = if null depths then 0 else maximum depths
 --         (trimmedTrees, added) = L.partition (\(_, tree) -> depthi tree == 1) subtrees
---     in if null trimmedTrees then []  
---        else trimmedTrees  
+--     in if null trimmedTrees then []
+--        else trimmedTrees

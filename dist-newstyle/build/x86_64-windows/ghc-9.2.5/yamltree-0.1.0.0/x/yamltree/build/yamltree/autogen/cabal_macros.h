@@ -70,6 +70,16 @@
   (major1) == 0 && (major2) <  1 || \
   (major1) == 0 && (major2) == 1 && (minor) <= 2)
 #endif /* MIN_VERSION_libyaml */
+/* package split-0.2.3.5 */
+#ifndef VERSION_split
+#define VERSION_split "0.2.3.5"
+#endif /* VERSION_split */
+#ifndef MIN_VERSION_split
+#define MIN_VERSION_split(major1,major2,minor) (\
+  (major1) <  0 || \
+  (major1) == 0 && (major2) <  2 || \
+  (major1) == 0 && (major2) == 2 && (minor) <= 3)
+#endif /* MIN_VERSION_split */
 /* package text-1.2.5.0 */
 #ifndef VERSION_text
 #define VERSION_text "1.2.5.0"
