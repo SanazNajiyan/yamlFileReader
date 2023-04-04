@@ -1,6 +1,17 @@
-a:
-  b:
-    c
-    d
-  e
-f:
+energies:
+    oil:
+        CRUDE_W_mini:
+        BRENT-LAST:
+        HEATOIL:
+        GASOILINE
+    gas:
+        GAS_US_mini:
+        GAS-LAST
+currencies:
+    usd-fx:
+        INR-SGX
+        EUR:
+        GBP
+    eur-fx:
+        EUR:
+        EURGBP:

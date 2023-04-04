@@ -32,7 +32,7 @@ import qualified Data.Text as T
 import qualified Data.Text.Encoding as TE
 import qualified Data.Text.Encoding.Error as TE
 import Data.String (IsString(..))
-import Data.Maybe
+import Data.Maybe (fromJust)
 import qualified Data.ByteString.Char8 as BS
 import qualified Data.ByteString.Lazy.Char8 as LBS
 import qualified Data.ByteString.Lazy as BSL
@@ -99,6 +99,21 @@ yamlTreeToStringIndented indentLevel (YamlTree ((key, value):rest)) =
         valueText = if isStringWithSpaces key
                         then  L.intercalate "" $ map (indent $ (indentLevel + 1) * 2) (words key)
                         else yamlTreeToStringIndented (indentLevel + 1) value
+--postProcessYamlTree is defined because when finding the leafs the keys with spaces are problematic and wrongly not taken as a separate leaf                        
+--it splits the key into separate nodes with empty values, essentially creating a nested structure. If the key does not have spaces, it simply recursively applies the same function to its child nodes
+postProcessYamlTree :: YamlTree -> YamlTree
+postProcessYamlTree (YamlTree []) = YamlTree []
+postProcessYamlTree (YamlTree ((k, yamlTree) : kyamls))
+  | isStringWithSpaces k =
+      let keys = words k
+          subTrees = [ (key, YamlTree []) | key <- keys ]
+          newSubTrees = map (\(key, _) -> (key, YamlTree [])) subTrees
+          newKyaml = concatMap (\(k', st') -> [(k', st')]) newSubTrees
+      in YamlTree newKyaml
+  | otherwise =
+      let kyaml = (k, postProcessYamlTree yamlTree)
+          newKyamls = kyaml : map (\(k', yamlTree') -> (k', postProcessYamlTree yamlTree')) kyamls
+      in YamlTree newKyamls
 
 isStringWithSpaces :: String -> Bool
 isStringWithSpaces s = ' ' `elem` s
@@ -185,34 +200,7 @@ mergeTuples :: [(String, YamlTree)] -> [(String, YamlTree)]
 mergeTuples [] = []
 mergeTuples ((key1, YamlTree []):(key2, YamlTree []):rest) = mergeTuples ((key1 ++ " " ++ key2, YamlTree []) : rest)
 mergeTuples (kv:rest) = kv : mergeTuples rest
------------NO this is not needed!!!
-instance Arbitrary Y.YamlValue where
-    arbitrary = Q.oneof [arbitraryMapping, arbitraryScalar]
-    
-arbitraryMapping :: Gen Y.YamlValue
-arbitraryMapping = Y.Mapping <$> arbitraryKeyVals <*> pure Nothing
-    where
-        arbitraryKeyVals = Q.listOf1 arbitraryKV
-        arbitraryKV = (,) <$> arbitraryText <*> arbitrary
-arbitraryScalar :: Q.Gen Y.YamlValue
-arbitraryScalar = Y.Scalar
-    <$> arbitraryByteString
-    <*> arbitraryTag
-    <*> arbitraryStyle
-    <*> pure Nothing
-    where
-        arbitraryByteString = TE.encodeUtf8 . T.pack <$> Q.listOf1 arbitraryChar
-        arbitraryTag = pure YL.StrTag -- only generate string tags for simplicity
-        arbitraryStyle = Q.elements [YL.Plain, YL.SingleQuoted, YL.DoubleQuoted, YL.Literal]
-        arbitraryChar = Q.elements ['a'..'z']
-arbitraryText :: Q.Gen T.Text
-arbitraryText = T.pack <$> Q.listOf1 arbitraryChar
 
-arbitraryChar :: Q.Gen Char
-arbitraryChar = Q.elements (['a'..'z'] ++ ['A'..'Z'] ++ ['0'..'9'])
-
-instance Q.Arbitrary YL.Style where
-    arbitrary = Q.elements [YL.Plain, YL.SingleQuoted, YL.DoubleQuoted, YL.Literal]
 -------q4-----------
 --finding the maximum depth of any sub-tree rooted at a value in kvs
 depthi :: YamlTree -> Int
@@ -250,38 +238,96 @@ regularizeSubTrees depth trees = let x = map (regularizeSubTree (depth -1)) tree
   in trace (show x) x
             --we compare the inner yamlTreewith desired depth we want
 
-regularizeSubTree :: Int ->(String, YamlTree) -> (String, YamlTree)
+regularizeSubTree :: Int -> (String, YamlTree) -> (String, YamlTree)
 regularizeSubTree depth a@(key, val) =
     let (key', YamlTree val') = if depthi val /= depth then addLevel (depth - depthi val) (key, val)
                                      else a-- make if part a binding andcall it inregularizeSubTrees
     in (key', YamlTree (regularizeSubTrees depth val'))
+
 addLevel :: Int ->(String, YamlTree) -> (String, YamlTree)
 addLevel 0 tuple = tuple
 addLevel i (key, val) = addLevel (i-1) (key , YamlTree [(key, val)])
+
 treeToList :: YamlTree -> [(String, YamlTree)]
 treeToList (YamlTree trees) = trees
+-----------q7--------------------
+--write an interactive (IO) program that traverses a YamlTree that checks whether any of the leaf labels overlap and generates a warning for them, specifying the multiple paths through the tree that lead to the leaf. For example, for "instruments-hierarchy.yaml", it should print
+-- "WARNING: instrument "EUR" occurs in multiple places in hierarchy:
+-- "currencies - usd-fx - EUR"
+-- "currencies - eur-fx - EUR""
+-- and for "instruments-hierarchy-regular.yaml" it should print
+-- "WARNING: instrument "EUR" occurs in multiple places in hierarchy:
+-- "currencies - currencies - usd-fx - EUR"
+-- "currencies - currencies - eur-fx - EUR""
+-- data YamlTree = YamlTree [(String, YamlTree)]
 
--- YamlTree [("bonds",YamlTree [("long-bonds",YamlTree [("us-long-bonds",YamlTree [("US10",YamlTree []), ("US20", YamlTree []), ("US30", YamlTree [])]),("KR10",YamlTree [("",YamlTree [])]),("eu-short-bonds",YamlTree [("OAT BTP",YamlTree [])])]),("short-bonds",YamlTree [("us-short-bonds",YamlTree [("US2 US3 US5",YamlTree [])]),("eu-short-bonds",YamlTree [("SHATZ BTP3",YamlTree [])]),("KR3",YamlTree [("",YamlTree [])])]),("STIRs",YamlTree [("EURIBOR FED",YamlTree [])])]),("energies",YamlTree [("oil",YamlTree [("CRUDE_W_mini BRENT-LAST HEATOIL GASOILINE",YamlTree [])]),("gas",YamlTree [("GAS_US_mini GAS-LAST",YamlTree [])])]),("currencies",YamlTree [("usd-fx",YamlTree [("INR-SGX EUR GBP",YamlTree [])]),("eur-fx",YamlTree [("EUR EURGBP",YamlTree [])])]),("equities",YamlTree [("us-equities",YamlTree [("SP500_mini R1000",YamlTree [])]),("eu-equities",YamlTree [("AEX DAX",YamlTree [])]),("asia-equities",YamlTree [("KOSPI",YamlTree [])])]),("vol",YamlTree [("VIX V2X VNKI",YamlTree [])])]
+--how many of the same leaf! In the leafCount function, the path parameter is used to keep track of the paths to the current leaf node. When a leaf node is found, the function checks if there is already an entry in the list of leaf counts for that node (which could happen if the same leaf node appears in multiple paths in the tree). If an entry is found, the count and paths fields are updated to include the current node's count and path, respectively. If no entry is found, a new entry is added to the list with the current node's count and path.
+leafCount :: (String, Int, [String]) -> [(String, Int, [String])] -> [(String, Int, [String])]
+leafCount (k,v,path) kvs = case L.find (\(k',_,_) -> k' == k) kvs of
+                        Just (_,count, paths) -> (k, count+v, path ++ paths) : filter (\(k',_,_) -> k' /= k) kvs
+                        Nothing -> (k,v,path) : kvs
+
+-- Traverse the tree and generate the leaf dictionary- generates a list of tuples representing the counts and paths of each leaf node
+leafCounts :: YamlTree -> [(String, Int, [String])]
+leafCounts (YamlTree []) = []
+leafCounts (YamlTree kvs) = concatMap (\(k,v) -> if isLeaf (k,v) then leafCount (k,1,[]) (leafDict kvs []) else leafCounts v) kvs
+
+isLeaf :: (String, YamlTree) -> Bool
+isLeaf (_, YamlTree []) = True
+isLeaf _ = False
+-- Generate a list of tuples representing counts and paths to leaf nodes.
+-- If the input is not a leaf node, recursively call `treeToList` and
+-- `leafDict` with the updated path to flatten the subtree and accumulate
+-- the result.
+leafDict :: [(String, YamlTree)] -> [String] -> [(String, Int, [String])]
+leafDict [] _ = []
+leafDict ((k,v):kvs) path | isLeaf(k,v) = (k, 1, reverse (k:path)) : leafDict kvs path
+                          | otherwise   = leafDict (treeToList v) (k:path) ++ leafDict kvs path
+
+
+printWarning :: (String, [[String]]) -> IO ()
+printWarning (label, paths) = do
+  putStrLn $ "WARNING: instrument \"" ++ label ++ "\" occurs in multiple places in hierarchy:"
+  mapM_ (\path -> putStrLn $ "- \"" ++ (unwords path) ++ "\"") paths
+
+
+-- checkDuplicateLeafs :: YamlTree -> IO ()
+-- checkDuplicateLeafs (YamlTree []) = print "sorry Tree empty"
+-- checkDuplicateLeafs a@(YamlTree kvs) = do
+--     let dict = mapM_ (\(k,v) -> (v,1)) (treeToList a)
 ---------------------------------------------------------------------------------
 main :: IO ()
 main = do
+    -- yamlValue <- parse "instruments-hierarchy.yaml"
+    -- let yamlTree = convertToYAMLTree yamlValue
+    -- --let yamlTree = YamlTree [("a", YamlTree [("b", YamlTree [("c", YamlTree []), ("d", YamlTree [])]), ("e", YamlTree [])]), ("f", YamlTree [])]
+    -- -- print (treeToList yamlTree)
+    --------q7 test
+    -- print ("leafCounts" ++ " :" ++ " ")
+    -- print (leafCounts yamlTree)
+    -- print ("leafDict" ++ " :" ++ " ")
+    -- print (leafDict (treeToList yamlTree) [])
+    --"leafDict= [("US10 US20 US30",1,["bonds","long-bonds","us-long-bonds","US10 US20 US30"]),("KR10",1,["bonds","long-bonds","KR10"]),("OAT BTP",1,["bonds","long-bonds","eu-short-bonds","OAT BTP"]),("US2 US3 US5",1,["bonds","short-bonds","us-short-bonds","US2 US3 US5"]),("SHATZ BTP3",1,["bonds","short-bonds","eu-short-bonds","SHATZ BTP3"]),("KR3",1,["bonds","short-bonds","KR3"]),("EURIBOR FED",1,["bonds","STIRs","EURIBOR FED"]),("CRUDE_W_mini BRENT-LAST HEATOIL GASOILINE",1,["energies","oil","CRUDE_W_mini BRENT-LAST HEATOIL GASOILINE"]),("GAS_US_mini GAS-LAST",1,["energies","gas","GAS_US_mini GAS-LAST"]),("INR-SGX",1,["currencies","usd-fx","INR-SGX"]),("EUR",1,["currencies","usd-fx","EUR"]),("GBP",1,["currencies","usd-fx","GBP"]),("EUR",1,["currencies","eur-fx","EUR"]),("EURGBP",1,["currencies","eur-fx","EURGBP"]),("SP500_mini R1000",1,["equities","us-equities","SP500_mini R1000"]),("AEX DAX",1,["equities","eu-equities","AEX DAX"]),("KOSPI",1,["equities","asia-equities","KOSPI"]),("VIX V2X VNKI",1,["vol","VIX V2X VNKI"])]
+    -- let yamlTree = YamlTree [("a", YamlTree [("b", YamlTree [("c", YamlTree []), ("d", YamlTree [])]), ("e", YamlTree [])]), ("f", YamlTree [])]
+    -- let overlappingLeaves = findOverlappingLeaves yamlTree
+    -- mapM_ printWarning overlappingLeaves
     -- input  <- Y.decodeFileThrow "instruments-hierarchy.yaml"
     -- output <- Y.decodeFileThrow "instruments-hierarchy-regular.yaml"
     -- let regularized = regularize input
     -- putStrLn (show $ regularized == output)
-    yamlValue <- parse "instruments-hierarchy.yaml"
-    print yamlValue
-    let yamlTree = convertToYAMLTree yamlValue
-    print yamlTree
-    let regularized = regularize yamlTree
+    -- yamlValue <- parse "instruments-hierarchy.yaml"
+    -- print yamlValue
+    -- let yamlTree = convertToYAMLTree yamlValue
+    -- print yamlTree
+    -- let regularized = regularize yamlTree
     -- -- yamlValue2 <- parse "instruments-hierarchy-regular.yaml"
     -- -- let yamlTree2 = convertToYAMLTree yamlValue2
     -- -- -- --print (prop_isRegular yamlTree) --works fine
     -- -- putStrLn (show $ regularized == yamlTree2)
-    print regularized
+    -- print regularized
     -- -- print (depthi yamlTree)
     -- -- print (isRegular yamlTree2)
-    yamlTreeToYamlFile "output1.yaml" regularized
+    -- yamlTreeToYamlFile "output1.yaml" regularized
     -- print (isRegular regularized)
     ----------------------testing partition---------not working []---
     -- let testInput = [("bonds",YamlTree [("long-bonds",YamlTree [("us-long-bonds",YamlTree [("US10 US20 US30",YamlTree [])]),("KR10",YamlTree [("KR10",YamlTree [])]),("eu-short-bonds",YamlTree [("OAT BTP",YamlTree [])])]),("short-bonds",YamlTree [("us-short-bonds",YamlTree [("US2 US3 US5",YamlTree [])]),("eu-short-bonds",YamlTree [("SHATZ BTP3",YamlTree [])]),("KR3",YamlTree [("KR3",YamlTree [])])]),("STIRs",YamlTree [("STIRs",YamlTree [("EURIBOR FED",YamlTree [])])])]),("energies",YamlTree [("energies",YamlTree [("oil",YamlTree [("CRUDE_W_mini BRENT-LAST HEATOIL GASOILINE",YamlTree [])]),("gas",YamlTree [("GAS_US_mini GAS-LAST",YamlTree [])])])]),("currencies",YamlTree [("currencies",YamlTree [("usd-fx",YamlTree [("INR-SGX EUR GBP",YamlTree [])]),("eur-fx",YamlTree [("EUR EURGBP",YamlTree [])])])]),("equities",YamlTree [("equities",YamlTree [("us-equities",YamlTree [("SP500_mini R1000",YamlTree [])]),("eu-equities",YamlTree [("AEX DAX",YamlTree [])]),("asia-equities",YamlTree [("KOSPI",YamlTree [])])])]),("vol",YamlTree [("vol",YamlTree [("vol",YamlTree [("VIX V2X VNKI",YamlTree [])])])])]
@@ -289,9 +335,7 @@ main = do
     -- let okTrees = L.filter (\(_, tree) -> depthi tree == 4) subtrees
     -- print okTrees
 --------------------------------
-    -- let yamlTree = YamlTree [("a", YamlTree [("b", YamlTree [("c", YamlTree []), ("d", YamlTree [])]), ("e", YamlTree [])]), ("f", YamlTree [])]
     -- yamlTreeToYamlFile "output.yaml" yamlTree
-    -- let regularizedTree = regularizeSubTree 2 [(" ", yamlTree)]
     -- yamlTreeToYamlFile "output1.yaml" (YamlTree $ regularizedTree)
     -- print regularizedTree
 
@@ -328,7 +372,7 @@ main = do
     --print $ convertToYAMLTree yamlValue
     --print (T.pack ":")
     --Q.verboseCheck (prop_my_io_action)
-    --Q.quickCheck (prop_my_io_action)
+    -- Q.quickCheck (prop_my_io_action)
     -- yamlValue <- parse "test.yaml"
     --let yamlTree = convertToYAMLTree yamlValue
     --Q.quickCheck $ prop_parser_prettyprinter
@@ -361,8 +405,13 @@ main = do
     -- --print (yamlTreeToStringIndented tree)
     -- yamlTreeToYamlFile "output.yaml" yamlTree
     -- --writeFile "output.yaml" (yamlTreeToTextIndented tree)
-
---arbitrary so that it never generates "" string.
+---------test postProcessing
+    
+  --let input = YamlTree [("bonds",YamlTree [("long-bonds",YamlTree [("us-long-bonds",YamlTree [("US10 US20 US30",YamlTree [])]),("KR10",YamlTree [("KR10",YamlTree [])]),("eu-short-bonds",YamlTree [("OAT BTP",YamlTree [])])]),("short-bonds",YamlTree [("us-short-bonds",YamlTree [("US2 US3 US5",YamlTree [])]),("eu-short-bonds",YamlTree [("SHATZ BTP3",YamlTree [])]),("KR3",YamlTree [("KR3",YamlTree [])])]),("STIRs",YamlTree [("STIRs",YamlTree [("EURIBOR FED",YamlTree [])])])]),("energies",YamlTree [("energies",YamlTree [("oil",YamlTree [("CRUDE_W_mini BRENT-LAST HEATOIL GASOILINE",YamlTree [])]),("gas",YamlTree [("GAS_US_mini GAS-LAST",YamlTree [])])])]),("currencies",YamlTree [("currencies",YamlTree [("usd-fx",YamlTree [("INR-SGX EUR GBP",YamlTree [])]),("eur-fx",YamlTree [("EUR EURGBP",YamlTree [])])])]),("equities",YamlTree [("equities",YamlTree [("us-equities",YamlTree [("SP500_mini R1000",YamlTree [])]),("eu-equities",YamlTree [("AEX DAX",YamlTree [])]),("asia-equities",YamlTree [("KOSPI",YamlTree [])])])]),("vol",YamlTree [("vol",YamlTree [("vol",YamlTree [("VIX V2X VNKI",YamlTree [])])])])]
+  -- let  input = YamlTree [("bonds",YamlTree [("long-bonds",YamlTree [("us-long-bonds",YamlTree [("US10 US20 US30",YamlTree [])]),("KR10",YamlTree [("KR10",YamlTree [])])])])]
+  -- print (postProcessYamlTree input) --output: YamlTree [("bonds",YamlTree [("long-bonds",YamlTree [("us-long-bonds",YamlTree [("US10",YamlTree []),("US20",YamlTree []),("US30",YamlTree [])]),("KR10",YamlTree [("KR10",YamlTree [])]),("eu-short-bonds",YamlTree [("OAT",YamlTree []),("BTP",YamlTree [])])]),("short-bonds",YamlTree [("us-short-bonds",YamlTree [("US2",YamlTree []),("US3",YamlTree []),("US5",YamlTree [])]),("eu-short-bonds",YamlTree [("SHATZ",YamlTree []),("BTP3",YamlTree [])]),("KR3",YamlTree [("KR3",YamlTree [])])]),("STIRs",YamlTree [("STIRs",YamlTree [("EURIBOR",YamlTree []),("FED",YamlTree [])])])]),("energies",YamlTree [("energies",YamlTree [("oil",YamlTree [("CRUDE_W_mini",YamlTree []),("BRENT-LAST",YamlTree []),("HEATOIL",YamlTree []),("GASOILINE",YamlTree [])]),("gas",YamlTree [("GAS_US_mini",YamlTree []),("GAS-LAST",YamlTree [])])])]),("currencies",YamlTree [("currencies",YamlTree [("usd-fx",YamlTree [("INR-SGX",YamlTree []),("EUR",YamlTree []),("GBP",YamlTree [])]),("eur-fx",YamlTree [("EUR",YamlTree []),("EURGBP",YamlTree [])])])]),("equities",YamlTree [("equities",YamlTree [("us-equities",YamlTree [("SP500_mini",YamlTree []),("R1000",YamlTree [])]),("eu-equities",YamlTree [("AEX",YamlTree []),("DAX",YamlTree [])]),("asia-equities",YamlTree [("KOSPI",YamlTree [])])])]),("vol",YamlTree [("vol",YamlTree [("vol",YamlTree [("VIX",YamlTree []),("V2X",YamlTree []),("VNKI",YamlTree [])])])])]
+------------------------
+  --arbitrary so that it never generates "" string.
 --I need to handle empty yaml file . can not be parsed ?
 --make a simplist yamlTree with text
 --pretty prineter should
@@ -383,14 +432,10 @@ main = do
     -- putStrLn $ show y1
     -- putStrLn $ show y2
 --SOALLLLLLA:problems: sanaz -> sanaz: in yaml file , seeing the result of prop not possible, asking about the YamlTree definition, YamlTree[YamlTree]??line 19 hierarchy.yaml        KR3:
---SOALLLLA: decodeFileThrow why doesn't respond-yaml file weird. not ideal structure. leaf missing, to regularize it is very inherent of . not how yaml works
+--SOALLLLA: decodeFileThrow why doesn't respond-yaml file weird. not ideal structure. leaf missing, to regularize it is very inherent of . not how yaml works, how yaml lib works with spaces I needed to postprocess a bit
 -- testi :: Int -> [(String, YamlTree)] -> [(String, YamlTree)]
 -- testi depth trees
 --   | depth == 0 = trees
 --   | otherwise =
 --     let subtrees = concatMap (\(_, tree) -> treeToList tree) trees
---         depths = map (depthi . snd) subtrees
---         maxDepth = if null depths then 0 else maximum depths
---         (trimmedTrees, added) = L.partition (\(_, tree) -> depthi tree == 1) subtrees
---     in if null trimmedTrees then []
---        else trimmedTrees
+
