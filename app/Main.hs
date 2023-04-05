@@ -267,44 +267,46 @@ leafCount (k,v,path) kvs = case L.find (\(k',_,_) -> k' == k) kvs of
                         Just (_,count, paths) -> (k, count+v, path ++ paths) : filter (\(k',_,_) -> k' /= k) kvs
                         Nothing -> (k,v,path) : kvs
 
--- Traverse the tree and generate the leaf dictionary- generates a list of tuples representing the counts and paths of each leaf node
-leafCounts :: YamlTree -> [(String, Int, [String])]
-leafCounts (YamlTree []) = []
-leafCounts (YamlTree kvs) = concatMap (\(k,v) -> if isLeaf (k,v) then leafCount (k,1,[]) (leafDict kvs []) else leafCounts v) kvs
 
-isLeaf :: (String, YamlTree) -> Bool
-isLeaf (_, YamlTree []) = True
-isLeaf _ = False
--- Generate a list of tuples representing counts and paths to leaf nodes.
--- If the input is not a leaf node, recursively call `treeToList` and
--- `leafDict` with the updated path to flatten the subtree and accumulate
--- the result.
+-- Traverse the tree and generate the leaf dictionary- generates a list of tuples representing the counts and paths of each leaf node
+leafCounts :: YamlTree -> [(String, [[String]])]
+leafCounts (YamlTree []) = []
+leafCounts (YamlTree kvs) = concatMap (\(k,v) -> if isLeaf (k,v) then [(k, [reverse (k:ps) | (_,_,ps) <- leafCount (k,1,[]) (leafDict kvs [])])] else leafCounts v) kvs
+
+
 leafDict :: [(String, YamlTree)] -> [String] -> [(String, Int, [String])]
 leafDict [] _ = []
 leafDict ((k,v):kvs) path | isLeaf(k,v) = (k, 1, reverse (k:path)) : leafDict kvs path
                           | otherwise   = leafDict (treeToList v) (k:path) ++ leafDict kvs path
+-- Check for overlapping labels in the leaf nodes and print warnings
+checkOverlappingLabels :: [(String, [[String]])] -> IO ()
+checkOverlappingLabels pathsList = do
+  let overlappingLabels = L.filter (\(_,paths) -> length paths > 1) pathsList
+  mapM_ (\(label, paths) -> printWarning label overlappingLabels) overlappingLabels
 
+isLeaf :: (String, YamlTree) -> Bool
+isLeaf (_, YamlTree []) = True
+isLeaf _ = False
 
-printWarning :: (String, [[String]]) -> IO ()
-printWarning (label, paths) = do
-  putStrLn $ "WARNING: instrument \"" ++ label ++ "\" occurs in multiple places in hierarchy:"
-  mapM_ (\path -> putStrLn $ "- \"" ++ (unwords path) ++ "\"") paths
+printWarning :: String -> [(String, [[String]])] -> IO ()
+printWarning label pathsList = case L.find (\(l,_) -> l == label) pathsList of
+                                  Just (_, paths) -> do
+                                    putStrLn $ "WARNING: instrument \"" ++ label ++ "\" occurs in multiple places in hierarchy:"
+                                    mapM_ (\path -> putStrLn $ "-- \"" ++ (unwords path) ++ "\"") paths
+                                  Nothing -> return ()
 
-
--- checkDuplicateLeafs :: YamlTree -> IO ()
--- checkDuplicateLeafs (YamlTree []) = print "sorry Tree empty"
--- checkDuplicateLeafs a@(YamlTree kvs) = do
---     let dict = mapM_ (\(k,v) -> (v,1)) (treeToList a)
----------------------------------------------------------------------------------
+--------------------------------------------------------------------------------
 main :: IO ()
 main = do
-    -- yamlValue <- parse "instruments-hierarchy.yaml"
-    -- let yamlTree = convertToYAMLTree yamlValue
+    yamlValue <- parse "instruments-hierarchy.yaml"
+    let yamlTree' = convertToYAMLTree yamlValue
+    let yamlTree = postProcessYamlTree yamlTree'
     -- --let yamlTree = YamlTree [("a", YamlTree [("b", YamlTree [("c", YamlTree []), ("d", YamlTree [])]), ("e", YamlTree [])]), ("f", YamlTree [])]
     -- -- print (treeToList yamlTree)
     --------q7 test
-    -- print ("leafCounts" ++ " :" ++ " ")
-    -- print (leafCounts yamlTree)
+    let leafCountsList = leafCounts yamlTree
+    checkOverlappingLabels leafCountsList
+
     -- print ("leafDict" ++ " :" ++ " ")
     -- print (leafDict (treeToList yamlTree) [])
     --"leafDict= [("US10 US20 US30",1,["bonds","long-bonds","us-long-bonds","US10 US20 US30"]),("KR10",1,["bonds","long-bonds","KR10"]),("OAT BTP",1,["bonds","long-bonds","eu-short-bonds","OAT BTP"]),("US2 US3 US5",1,["bonds","short-bonds","us-short-bonds","US2 US3 US5"]),("SHATZ BTP3",1,["bonds","short-bonds","eu-short-bonds","SHATZ BTP3"]),("KR3",1,["bonds","short-bonds","KR3"]),("EURIBOR FED",1,["bonds","STIRs","EURIBOR FED"]),("CRUDE_W_mini BRENT-LAST HEATOIL GASOILINE",1,["energies","oil","CRUDE_W_mini BRENT-LAST HEATOIL GASOILINE"]),("GAS_US_mini GAS-LAST",1,["energies","gas","GAS_US_mini GAS-LAST"]),("INR-SGX",1,["currencies","usd-fx","INR-SGX"]),("EUR",1,["currencies","usd-fx","EUR"]),("GBP",1,["currencies","usd-fx","GBP"]),("EUR",1,["currencies","eur-fx","EUR"]),("EURGBP",1,["currencies","eur-fx","EURGBP"]),("SP500_mini R1000",1,["equities","us-equities","SP500_mini R1000"]),("AEX DAX",1,["equities","eu-equities","AEX DAX"]),("KOSPI",1,["equities","asia-equities","KOSPI"]),("VIX V2X VNKI",1,["vol","VIX V2X VNKI"])]
