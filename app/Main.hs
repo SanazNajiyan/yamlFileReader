@@ -262,23 +262,45 @@ treeToList (YamlTree trees) = trees
 -- data YamlTree = YamlTree [(String, YamlTree)]
 
 --how many of the same leaf! In the leafCount function, the path parameter is used to keep track of the paths to the current leaf node. When a leaf node is found, the function checks if there is already an entry in the list of leaf counts for that node (which could happen if the same leaf node appears in multiple paths in the tree). If an entry is found, the count and paths fields are updated to include the current node's count and path, respectively. If no entry is found, a new entry is added to the list with the current node's count and path.
-leafCount :: (String, Int, [String]) -> [(String, Int, [String])] -> [(String, Int, [String])]
-leafCount (k,v,path) kvs = case L.find (\(k',_,_) -> k' == k) kvs of
-                        Just (_,count, paths) -> (k, count+v, path ++ paths) : filter (\(k',_,_) -> k' /= k) kvs
-                        Nothing -> (k,v,path) : kvs
+-- leafDict :: [(String, YamlTree)] -> [String] -> [(String, Int, [String])]
+-- leafDict [] _ = []
+-- leafDict ((k,v):kvs) path | isLeaf(k,v) = (k, 1, reverse (k:path)) : leafDict kvs path
+--                           | otherwise   = leafDict (treeToList v) (k:path) ++ leafDict kvs path
+-- leafDict :: [(String, YamlTree)] -> [String] -> [(String, Int, [[String]])]
+-- leafDict [] _ = []
+-- leafDict ((k, v) : kvs) path
+--   | isLeaf (k, v) = (k, 1, concat $ reverse (k : path) : []) : leafDict kvs path
+--   | otherwise = leafDict (treeToList v) (k : path) ++ leafDict kvs path
+-- leafDict :: [(String, YamlTree)] -> [String] -> [(String, Int, [String])]
+-- leafDict [] _ = []
+-- leafDict ((k, v) : kvs) path
+--   | isLeaf (k, v) = [(k, 1, reverse (k : path))]
+--   | otherwise = leafDict (treeToList v) [] ++ leafDict kvs path
+leafDict :: [(String, YamlTree)] -> [String] -> [(String, Int, [[String]])]
+leafDict [] _ = []
+leafDict ((k, v) : kvs) path
+  | isLeaf (k, v) = [(k, 1, [reverse (k : path)])]
+  | otherwise = leafDict (treeToList v) (k : path) ++ leafDict kvs path
 
+--[(leaf1, 1, path1), (leaf2, 1, path2)..]
+leafCount :: (String, Int, [String]) -> [(String, Int, [[String]])] -> [(String, Int, [[String]])]
+leafCount (k, v, path) kvs =
+  case L.find (\(k', _, _) -> k' == k) kvs of
+    Just (k', count, paths) -> (k', count + v, paths ++ [path]) : filter (\(k'', _, _) -> k'' /= k) kvs
+    Nothing -> (k, v, [path]) : kvs            
+--[(leaf1, 1, [[path1], [path2]]), (leaf2, 1, path2)..]
 
--- Traverse the tree and generate the leaf dictionary- generates a list of tuples representing the counts and paths of each leaf node
 leafCounts :: YamlTree -> [(String, [[String]])]
 leafCounts (YamlTree []) = []
-leafCounts (YamlTree kvs) = concatMap (\(k,v) -> if isLeaf (k,v) then [(k, [reverse (k:ps) | (_,_,ps) <- leafCount (k,1,[]) (leafDict kvs [])])] else leafCounts v) kvs
+leafCounts (YamlTree kvs) =
+  concatMap
+    ( \(k, v) ->
+        if isLeaf (k, v)
+          then [(k, [reverse (concat ps) | (_, _, ps) <- leafCount (k, 1, []) (leafDict kvs [])])]
+          else [(k, concat [ps | (_, ps) <- leafCounts v])]
+    ) kvs
 
-
-leafDict :: [(String, YamlTree)] -> [String] -> [(String, Int, [String])]
-leafDict [] _ = []
-leafDict ((k,v):kvs) path | isLeaf(k,v) = (k, 1, reverse (k:path)) : leafDict kvs path
-                          | otherwise   = leafDict (treeToList v) (k:path) ++ leafDict kvs path
--- Check for overlapping labels in the leaf nodes and print warnings
+  -- Check for overlapping labels in the leaf nodes and print warnings
 checkOverlappingLabels :: [(String, [[String]])] -> IO ()
 checkOverlappingLabels pathsList = do
   let overlappingLabels = L.filter (\(_,paths) -> length paths > 1) pathsList
