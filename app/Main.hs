@@ -38,7 +38,6 @@ import qualified Data.ByteString.Lazy.Char8 as LBS
 import qualified Data.ByteString.Lazy as BSL
 import qualified Data.Yaml.Pretty as PP
 import GHC.Generics
-import qualified Data.Map.Strict as Map
 import qualified Data.Map as Map
 
 import Debug.Trace (trace)
@@ -47,6 +46,13 @@ import Debug.Trace (trace)
 
 data YamlTree = YamlTree [(String, YamlTree)]
     deriving (Ord, Eq, Show, Generic)
+
+-- WeightedYamlTree should be the same as above but with a extra Float in the constructor
+-- PYamlTree should be the same as the above, but with a type variable 'a' instead of the Float
+-- then, redefine YamlTree and WeightedYamlTree in terms of PYamlTree (so fill in the 'a' with either () or Float)
+-- this will break the types of a few functions maybe, so maybe you'll have to add a few ()'s where the types don't match-- SOAL
+-- implement Functor (fmap) for PYamlTree
+-- throwOutWeights wTree = fmap (const ()) wTree
 
 --parse function reads the YAML file using the readYamlFile function from the yaml package and returns a Y.YamlValue representing the parsed YAML content
 --with this implementation only YamlTree [("ExampleKey2",YamlTree [("ExampleKey2",YamlTree []),("ExampleKey2",YamlTree [])])] doesn't work!!!
@@ -99,7 +105,7 @@ yamlTreeToStringIndented indentLevel (YamlTree ((key, value):rest)) =
         valueText = if isStringWithSpaces key
                         then  L.intercalate "" $ map (indent $ (indentLevel + 1) * 2) (words key)
                         else yamlTreeToStringIndented (indentLevel + 1) value
---postProcessYamlTree is defined because when finding the leafs the keys with spaces are problematic and wrongly not taken as a separate leaf                        
+--postProcessYamlTree is defined because when finding the leafs the keys with spaces are problematic and wrongly not taken as a separate leaf
 --it splits the key into separate nodes with empty values, essentially creating a nested structure. If the key does not have spaces, it simply recursively applies the same function to its child nodes
 postProcessYamlTree :: YamlTree -> YamlTree
 postProcessYamlTree (YamlTree []) = YamlTree []
@@ -276,18 +282,28 @@ treeToList (YamlTree trees) = trees
 -- leafDict ((k, v) : kvs) path
 --   | isLeaf (k, v) = [(k, 1, reverse (k : path))]
 --   | otherwise = leafDict (treeToList v) [] ++ leafDict kvs path
+type Path = [String]
+
+leafCounts' :: [(String, YamlTree)] -> Path -> Map.Map String [Path]
+leafCounts' [] _ = Map.empty
+leafCounts' ((k,v) : kvs) path
+  | isLeaf (k,v) = Map.insertWith (\x y -> x ++ y) k [reverse (k : path)] (leafCounts' kvs path)
+  | otherwise = Map.unionWith (\x y -> x ++ y) (leafCounts' (treeToList v) (k : path)) (leafCounts' kvs path)
+
+
+
 leafDict :: [(String, YamlTree)] -> [String] -> [(String, Int, [[String]])]
 leafDict [] _ = []
 leafDict ((k, v) : kvs) path
-  | isLeaf (k, v) = [(k, 1, [reverse (k : path)])]
+  | isLeaf (k, v) = [(k, 1, [reverse (k : path)])] ++ leafDict kvs path
   | otherwise = leafDict (treeToList v) (k : path) ++ leafDict kvs path
-
+--maybe use map(\) instead of this later
 --[(leaf1, 1, path1), (leaf2, 1, path2)..]
 leafCount :: (String, Int, [String]) -> [(String, Int, [[String]])] -> [(String, Int, [[String]])]
 leafCount (k, v, path) kvs =
   case L.find (\(k', _, _) -> k' == k) kvs of
     Just (k', count, paths) -> (k', count + v, paths ++ [path]) : filter (\(k'', _, _) -> k'' /= k) kvs
-    Nothing -> (k, v, [path]) : kvs            
+    Nothing -> (k, v, [path]) : kvs
 --[(leaf1, 1, [[path1], [path2]]), (leaf2, 1, path2)..]
 
 leafCounts :: YamlTree -> [(String, [[String]])]
@@ -295,10 +311,10 @@ leafCounts (YamlTree []) = []
 leafCounts (YamlTree kvs) =
   concatMap
     ( \(k, v) ->
-        if isLeaf (k, v)
-          then [(k, [reverse (concat ps) | (_, _, ps) <- leafCount (k, 1, []) (leafDict kvs [])])]
-          else [(k, concat [ps | (_, ps) <- leafCounts v])]
-    ) kvs
+        if isLeaf (k, v) --If the value is a leaf, add a tuple to the result list with the key as the label and a list of paths that lead to the label. The paths are obtained by calling the leafCount function, which recursively counts the occurrence of the label in the tree and returns the paths that lead to it.
+          then [(k, [(k : concat paths) | (_, _, paths) <- leafCount (k, 1, []) (leafDict kvs [])])]
+          else [(k, [path ++ [k] | path <- concat [ps | (_, ps) <- leafCounts v]])] --If the value is not a leaf, recursively call leafCounts on the value and add the resulting list of tuples to the result list with the key as the label.
+    ) kvs --else part means if this is not a leaf then something else is. which should be found recursively with leafCounts until leaf
 
   -- Check for overlapping labels in the leaf nodes and print warnings
 checkOverlappingLabels :: [(String, [[String]])] -> IO ()
@@ -316,19 +332,89 @@ printWarning label pathsList = case L.find (\(l,_) -> l == label) pathsList of
                                     putStrLn $ "WARNING: instrument \"" ++ label ++ "\" occurs in multiple places in hierarchy:"
                                     mapM_ (\path -> putStrLn $ "-- \"" ++ (unwords path) ++ "\"") paths
                                   Nothing -> return ()
+----------q8
+--Write a function longestPath :: YamlTree -> [String] that finds the longest path in a YamlTree.
+--Here, counts is a Map that maps each leaf label to a list of all paths that end in that leaf. paths is a list of all those paths, obtained by concatenating the lists of paths for each leaf. Finally, maximumBy is used to obtain the longest path from paths
+longestPath :: YamlTree -> Path
+longestPath tree =
+  let counts = leafCounts' (treeToList tree) []
+      paths = Map.foldr (\p acc -> acc ++ p) [] counts
+  in maximumBy (compare `on` length) paths
+-- Using equational reasoning, write down a formal proof that length . longestPath = depth . Please specify all definitions you use in the proof and give them a label. Please clearly state any induction hypotheses you use. Please justify each proof step with the label of the definition or with I.H. for an induction hypothesis.
+--q9:Now, please implement a variant of the YamlTree datatype that we call a WeightedYamlTree: a YamlTree that further carries a Float for the relative weight of each (proper) subtree (each of which is again a WeightedYamlTree).
+data WeightedYamlTree = WeightedYamlTree Float [(String, WeightedYamlTree)] deriving Show
+--this would be more appropriate as it allows the weight to be associated with any subtree, not just child nodes. I need to ask this
+--data WeightedYamlTree = WeightedYamlTree [(String, Float, WeightedYamlTree)] deriving Show
+--q10: Define a parameterized datatype data PYamlTree a = ... such that YamlTree and WeightedYamlTree could be reimplemented as special cases of it. Please make PYamlTree an instance of Functor and use fmap to define a function that "throws away the weights" of a WeightedYamlTree to produce the underlying YamlTree.
+data PYamlTree a = PYamlTree a [(String, PYamlTree a)] deriving Show
+--To make PYamlTree an instance of Functor, we can define the following fmap function:
+instance Functor PYamlTree where
+  fmap f (PYamlTree x ts) = PYamlTree (f x) [(k, fmap f t) | (k, t) <- ts]
+--q11:Define a function find :: String -> YamlTree -> Bool that checks whether a node with a certain String label exists in a YamlTree. Please explain how the laziness of Haskell affects the efficiency of find.
+-- find' :: String -> YamlTree -> Bool
+-- find' str yamlTree = case lookup str (treeToList yamlTree) of
+--   Just _ -> True
+--   Nothing -> False
+find' :: String -> YamlTree -> Bool
+find' key (YamlTree ts) = any (checkKey key) ts || any (find' key . snd) ts
+  where
+    checkKey k (k', _) = k == k'
 
+--answer the effect of laziness:
+--find' searches the tree as far as necessary to find the node with the specified label. This means that if the label is found early in the tree, the function will terminate quickly, without searching the rest of the tree. On the other hand, if the label is not found, the function may have to traverse the entire tree, which could potentially be inefficient. Yet, Haskell's lazy evaluation allows for efficient searching of large trees, since it only evaluates the parts of the tree that are needed to find the label.
+--q12:Write an interactive (IO) program that does a depth-first traversal of a YamlTree that asks the user to specify weights for each subtree to interactively convert the original YamlTree into a WeightedYamlTree. It should first ask whether the user wants to equal weight subtrees. If so, assign equal weights to the child nodes (subtrees) that add up to the weight of the parent node (the tree itself). If not, interactively prompt the user to input relative weights for the child nodes, which should then be used as the weights in the WeightedYamlTree after normalizing them to add up to the weight of the parent node. For the case of a single child node, no input should be asked from the user as no weighting decision has the be made. The whole tree should be assigned weight 1
+-- traverseTree :: YamlTree -> IO WeightedYamlTree
+-- traverseTree yamlTree = do
+--   putStrLn "Enter the weight for this subtree (between 0 and 1):"
+--   weightStr <- getLine
+--   let weight = read weightStr :: Float
+--   case yamlTree of
+--     YamlTree [] ->
+--       return $ WeightedYamlTree weight []
+--     YamlTree [(key, subtree)] -> do
+--       weightedSubtree <- traverseTree subtree
+--       return $ WeightedYamlTree weight [(key, weightedSubtree)]
+--     YamlTree subtrees -> do
+--       putStrLn "Do you want to equal weight subtrees? (y/n)"
+--       answer <- getLine
+--       case answer of
+--         "y" -> do
+--           let numSubtrees = length subtrees
+--               equalWeight = weight / fromIntegral numSubtrees
+--           weightedSubtrees <- mapM (\(key, subtree) -> do
+--             weightedSubtree <- traverseTree subtree
+--             return (key, weightedSubtree { treeWeight = equalWeight })) subtrees
+--           return $ WeightedYamlTree weight weightedSubtrees
+--         "n" -> do
+--           let numSubtrees = length subtrees
+--           putStrLn "Enter the relative weights for each subtree (separated by spaces):"
+--           weightsStr <- getLine
+--           let weights = map read $ words weightsStr :: [Float]
+--               totalWeight = sum weights
+--               normalizedWeights = map (/ totalWeight) weights
+--           weightedSubtrees <- zipWithM (\(key, subtree) weight -> do
+--             weightedSubtree <- traverseTree subtree
+--             return (key, weightedSubtree { treeWeight = weight })) subtrees normalizedWeights
+--           return $ WeightedYamlTree weight weightedSubtrees
+--         _ -> do
+--           putStrLn "Invalid input. Please enter y or n."
+--           traverseTree yamlTree
 --------------------------------------------------------------------------------
 main :: IO ()
 main = do
     yamlValue <- parse "instruments-hierarchy.yaml"
     let yamlTree' = convertToYAMLTree yamlValue
     let yamlTree = postProcessYamlTree yamlTree'
+    --print (yamlTree)
     -- --let yamlTree = YamlTree [("a", YamlTree [("b", YamlTree [("c", YamlTree []), ("d", YamlTree [])]), ("e", YamlTree [])]), ("f", YamlTree [])]
     -- -- print (treeToList yamlTree)
     --------q7 test
-    let leafCountsList = leafCounts yamlTree
-    checkOverlappingLabels leafCountsList
-
+    -- let leafCountsList = leafCounts' (treeToList yamlTree) []
+    -- print leafCountsList
+    -- checkOverlappingLabels $ Map.toList leafCountsList
+--------q8
+    -- print(longestPath yamlTree)
+    print (find' "us-long-bonds" yamlTree)
     -- print ("leafDict" ++ " :" ++ " ")
     -- print (leafDict (treeToList yamlTree) [])
     --"leafDict= [("US10 US20 US30",1,["bonds","long-bonds","us-long-bonds","US10 US20 US30"]),("KR10",1,["bonds","long-bonds","KR10"]),("OAT BTP",1,["bonds","long-bonds","eu-short-bonds","OAT BTP"]),("US2 US3 US5",1,["bonds","short-bonds","us-short-bonds","US2 US3 US5"]),("SHATZ BTP3",1,["bonds","short-bonds","eu-short-bonds","SHATZ BTP3"]),("KR3",1,["bonds","short-bonds","KR3"]),("EURIBOR FED",1,["bonds","STIRs","EURIBOR FED"]),("CRUDE_W_mini BRENT-LAST HEATOIL GASOILINE",1,["energies","oil","CRUDE_W_mini BRENT-LAST HEATOIL GASOILINE"]),("GAS_US_mini GAS-LAST",1,["energies","gas","GAS_US_mini GAS-LAST"]),("INR-SGX",1,["currencies","usd-fx","INR-SGX"]),("EUR",1,["currencies","usd-fx","EUR"]),("GBP",1,["currencies","usd-fx","GBP"]),("EUR",1,["currencies","eur-fx","EUR"]),("EURGBP",1,["currencies","eur-fx","EURGBP"]),("SP500_mini R1000",1,["equities","us-equities","SP500_mini R1000"]),("AEX DAX",1,["equities","eu-equities","AEX DAX"]),("KOSPI",1,["equities","asia-equities","KOSPI"]),("VIX V2X VNKI",1,["vol","VIX V2X VNKI"])]
