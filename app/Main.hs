@@ -349,60 +349,93 @@ data WeightedYamlTree = WeightedYamlTree Float [(String, WeightedYamlTree)] deri
 data PYamlTree a = PYamlTree a [(String, PYamlTree a)] deriving Show
 --To make PYamlTree an instance of Functor, we can define the following fmap function:
 instance Functor PYamlTree where
-  fmap f (PYamlTree x ts) = PYamlTree (f x) [(k, fmap f t) | (k, t) <- ts]
+  fmap f (PYamlTree x ts) = PYamlTree (f x) [(k, fmap f t) | (k, t) <- ts] --to test construct a tree and fmap (+1) ..
 --q11:Define a function find :: String -> YamlTree -> Bool that checks whether a node with a certain String label exists in a YamlTree. Please explain how the laziness of Haskell affects the efficiency of find.
--- find' :: String -> YamlTree -> Bool
--- find' str yamlTree = case lookup str (treeToList yamlTree) of
---   Just _ -> True
---   Nothing -> False
+
 find' :: String -> YamlTree -> Bool
 find' key (YamlTree ts) = any (checkKey key) ts || any (find' key . snd) ts
   where
     checkKey k (k', _) = k == k'
 
 --answer the effect of laziness:
---find' searches the tree as far as necessary to find the node with the specified label. This means that if the label is found early in the tree, the function will terminate quickly, without searching the rest of the tree. On the other hand, if the label is not found, the function may have to traverse the entire tree, which could potentially be inefficient. Yet, Haskell's lazy evaluation allows for efficient searching of large trees, since it only evaluates the parts of the tree that are needed to find the label.
---q12:Write an interactive (IO) program that does a depth-first traversal of a YamlTree that asks the user to specify weights for each subtree to interactively convert the original YamlTree into a WeightedYamlTree. It should first ask whether the user wants to equal weight subtrees. If so, assign equal weights to the child nodes (subtrees) that add up to the weight of the parent node (the tree itself). If not, interactively prompt the user to input relative weights for the child nodes, which should then be used as the weights in the WeightedYamlTree after normalizing them to add up to the weight of the parent node. For the case of a single child node, no input should be asked from the user as no weighting decision has the be made. The whole tree should be assigned weight 1
--- traverseTree :: YamlTree -> IO WeightedYamlTree
--- traverseTree yamlTree = do
---   putStrLn "Enter the weight for this subtree (between 0 and 1):"
---   weightStr <- getLine
---   let weight = read weightStr :: Float
---   case yamlTree of
---     YamlTree [] ->
---       return $ WeightedYamlTree weight []
---     YamlTree [(key, subtree)] -> do
---       weightedSubtree <- traverseTree subtree
---       return $ WeightedYamlTree weight [(key, weightedSubtree)]
---     YamlTree subtrees -> do
---       putStrLn "Do you want to equal weight subtrees? (y/n)"
---       answer <- getLine
---       case answer of
---         "y" -> do
---           let numSubtrees = length subtrees
---               equalWeight = weight / fromIntegral numSubtrees
---           weightedSubtrees <- mapM (\(key, subtree) -> do
---             weightedSubtree <- traverseTree subtree
---             return (key, weightedSubtree { treeWeight = equalWeight })) subtrees
---           return $ WeightedYamlTree weight weightedSubtrees
---         "n" -> do
---           let numSubtrees = length subtrees
---           putStrLn "Enter the relative weights for each subtree (separated by spaces):"
---           weightsStr <- getLine
---           let weights = map read $ words weightsStr :: [Float]
---               totalWeight = sum weights
---               normalizedWeights = map (/ totalWeight) weights
---           weightedSubtrees <- zipWithM (\(key, subtree) weight -> do
---             weightedSubtree <- traverseTree subtree
---             return (key, weightedSubtree { treeWeight = weight })) subtrees normalizedWeights
---           return $ WeightedYamlTree weight weightedSubtrees
---         _ -> do
---           putStrLn "Invalid input. Please enter y or n."
---           traverseTree yamlTree
+-- find' searches the tree as far as necessary to find the node with the
+-- specified label. This means that if the label is found early in the tree, the
+-- function will terminate quickly, without searching the rest of the tree. On
+-- the other hand. Yet, Haskell's lazy (early exit)
+-- evaluation allows for efficient searching of large trees, since it only
+-- evaluates the parts of the tree that are needed to find the label.
+----q12
+--q12:Write an interactive (IO) program that does a depth-first traversal of a
+--YamlTree that asks the user to specify weights for each subtree to
+--interactively convert the original YamlTree into a WeightedYamlTree. It should
+--first ask whether the user wants to equal weight subtrees. If so, assign equal
+--weights to the child nodes (subtrees) that add up to the weight of the parent
+--node (the tree itself). If not, interactively prompt the user to input
+--relative weights for the child nodes, which should then be used as the weights
+--in the WeightedYamlTree after normalizing them to add up to the weight of the
+--parent node. For the case of a single child node, no input should be asked
+--from the user as no weighting decision has the be made. The whole tree should
+--be assigned weight 1
+-- Depth-first traversal of YamlTree to convert it into a WeightedYamlTree
+
+traverseTreeUntilLeaf :: YamlTree -> IO WeightedYamlTree
+traverseTreeUntilLeaf (YamlTree []) = do
+  putStrLn "Reached leaf node."
+  weight <- askSubtreeWeight
+  return $ WeightedYamlTree weight []
+traverseTreeUntilLeaf (YamlTree ts) = do
+  putStrLn "Non-leaf node. Enter weight for this level:"
+  weight <- askSubtreeWeight
+  subtrees' <- mapM (\(_, t) -> traverseTreeUntilLeaf t) ts
+  let subnodes = zip (map fst ts) subtrees'
+  return $ WeightedYamlTree weight subnodes
+
+askSubtreeWeight :: IO Float
+askSubtreeWeight = do
+  putStrLn "Please enter the weight for this subtree:"
+  input <- getLine
+  case readFloat input of
+    Just weight -> return weight
+    Nothing     -> do
+                     putStrLn "Invalid input. Please enter a float."
+                     askSubtreeWeight
+readFloat :: String -> Maybe Float
+readFloat s = case reads s of
+                [(x, "")] -> Just x
+                _         -> Nothing
+
+traverseTree :: YamlTree -> IO WeightedYamlTree
+traverseTree yamlTree = traverseTree' 1.0 yamlTree                     
+traverseTree' :: Float -> YamlTree -> IO WeightedYamlTree
+traverseTree' w (YamlTree ts) = do
+  let n = length ts
+  if n == 1
+    then do
+      let [(name, subtree)] = ts
+      wyt <- traverseTreeUntilLeaf subtree
+      return $ WeightedYamlTree w [(name, wyt)]
+    else do
+      weights <- case n of
+        2 -> return [0.5, 0.5]
+        3 -> return [0.33, 0.33, 0.34]
+        _ -> replicateM n askSubtreeWeight
+      let totalWeight = sum weights
+          normalizedWeights = map (/ totalWeight) weights
+      subtrees <- mapM (\((name, t), w') -> do
+        wyt <- traverseTree' w' t
+        return (name, wyt)) (zip ts normalizedWeights)
+      return $ WeightedYamlTree w subtrees
+
+--q13
+
+--q13:Now, please write a pretty printer for WeightedYamlTrees that produces
+--"instruments_hierarchy_weighted.yaml" for the YamlTree corresponding to
+--"instruments_hierarchy_regular.yaml", for example. (Again, no hard-coding!)
+
 --------------------------------------------------------------------------------
 main :: IO ()
 main = do
-    yamlValue <- parse "instruments-hierarchy.yaml"
+    yamlValue <- parse "output3.yaml"
     let yamlTree' = convertToYAMLTree yamlValue
     let yamlTree = postProcessYamlTree yamlTree'
     --print (yamlTree)
@@ -414,7 +447,9 @@ main = do
     -- checkOverlappingLabels $ Map.toList leafCountsList
 --------q8
     -- print(longestPath yamlTree)
-    print (find' "us-long-bonds" yamlTree)
+    -- print (find' "us-long-bonds" yamlTree)
+    output <- traverseTree yamlTree
+    print output
     -- print ("leafDict" ++ " :" ++ " ")
     -- print (leafDict (treeToList yamlTree) [])
     --"leafDict= [("US10 US20 US30",1,["bonds","long-bonds","us-long-bonds","US10 US20 US30"]),("KR10",1,["bonds","long-bonds","KR10"]),("OAT BTP",1,["bonds","long-bonds","eu-short-bonds","OAT BTP"]),("US2 US3 US5",1,["bonds","short-bonds","us-short-bonds","US2 US3 US5"]),("SHATZ BTP3",1,["bonds","short-bonds","eu-short-bonds","SHATZ BTP3"]),("KR3",1,["bonds","short-bonds","KR3"]),("EURIBOR FED",1,["bonds","STIRs","EURIBOR FED"]),("CRUDE_W_mini BRENT-LAST HEATOIL GASOILINE",1,["energies","oil","CRUDE_W_mini BRENT-LAST HEATOIL GASOILINE"]),("GAS_US_mini GAS-LAST",1,["energies","gas","GAS_US_mini GAS-LAST"]),("INR-SGX",1,["currencies","usd-fx","INR-SGX"]),("EUR",1,["currencies","usd-fx","EUR"]),("GBP",1,["currencies","usd-fx","GBP"]),("EUR",1,["currencies","eur-fx","EUR"]),("EURGBP",1,["currencies","eur-fx","EURGBP"]),("SP500_mini R1000",1,["equities","us-equities","SP500_mini R1000"]),("AEX DAX",1,["equities","eu-equities","AEX DAX"]),("KOSPI",1,["equities","asia-equities","KOSPI"]),("VIX V2X VNKI",1,["vol","VIX V2X VNKI"])]
