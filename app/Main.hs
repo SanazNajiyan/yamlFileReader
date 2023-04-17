@@ -18,7 +18,6 @@ import Control.Monad (replicateM)
 import Data.Yaml.Pretty
 import Data.List as L (maximumBy, groupBy, sortOn)
 import Data.Ord (comparing)
-import Debug.Trace
 import Control.Monad as MO (when)
 import qualified Data.Char as C
 import qualified Data.Yaml as Y
@@ -40,7 +39,6 @@ import qualified Data.ByteString.Lazy as BSL
 import qualified Data.Yaml.Pretty as PP
 import GHC.Generics
 import qualified Data.Map as Map
-
 import Debug.Trace (trace)
 --We (recursively) call a YamlTree regular if all of its (proper) subtrees have the same depth and are regular themselves. Please implement a QuickCheck test that checks whether a YamlTree is regular.
 
@@ -378,78 +376,68 @@ find' key (YamlTree ts) = any (checkKey key) ts || any (find' key . snd) ts
 --from the user as no weighting decision has the be made. The whole tree should
 --be assigned weight 1
 -- Depth-first traversal of YamlTree to convert it into a WeightedYamlTree
+
+
 traverseTree :: YamlTree -> WYTree
-traverseTree (YamlTree ts) = 
+traverseTree (YamlTree ts) =
   let traverseSubtree (name, subtree) = (name, 1.0, traverseTree' subtree)
   in WYTree [("root", 1.0, WYTree $ map traverseSubtree ts)]
 
 traverseTree' :: YamlTree -> WYTree
-traverseTree' (YamlTree ts) = 
+traverseTree' (YamlTree ts) =
   let traverseSubtree name subtree = (name, 1.0, traverseTree' subtree)
   in WYTree $ map (\(name, subtree) -> traverseSubtree name subtree) ts
-
+--these 2 functions are used for the case of equal weights
 equalWYTree :: WYTree -> WYTree
 equalWYTree (WYTree ts) =
   let n = length ts
+  --trace (show n) n
       equalWeight = 1.0 / fromIntegral n
       subtrees = map (\(name, _, t) -> (name, equalWeight, equalWYTree (weightCalculator equalWeight t))) ts
   in WYTree subtrees
-
 weightCalculator :: Float -> WYTree -> WYTree
 weightCalculator parentWeight (WYTree ts) =
   let n = length ts
       equalWeight = parentWeight / fromIntegral n
       subtrees = map (\(name, _, t) -> (name, equalWeight, equalWYTree (weightCalculator equalWeight t))) ts
   in WYTree subtrees
-
--- userWeightRequest :: WYTree -> IO WYTree
--- userWeightRequest tree = do
---   eqWeight <- isEqualWeight
---   if eqWeight
---     then return $ equalWYTree tree
---     else return tree
+--test = WYTree [("root",1.0,WYTree [("bonds",1.0,WYTree [("long-bonds",1.0,WYTree [("us-long-bonds",1.0,WYTree [("US10",1.0,WYTree []),("US20",1.0,WYTree []),("US30",1.0,WYTree [])]),("KR10",1.0,WYTree []),("eu-short-bonds",1.0,WYTree [("OAT",1.0,WYTree []),("BTP",1.0,WYTree [])])]),("short-bonds",1.0,WYTree [("us-short-bonds",1.0,WYTree [("US2",1.0,WYTree []),("US3",1.0,WYTree []),("US5",1.0,WYTree [])]),("eu-short-bonds",1.0,WYTree [("SHATZ",1.0,WYTree []),("BTP3",1.0,WYTree [])]),("KR3",1.0,WYTree [])]),("STIRs",1.0,WYTree [("EURIBOR",1.0,WYTree []),("FED",1.0,WYTree [])])]),("energies",1.0,WYTree [("oil",1.0,WYTree [("CRUDE_W_mini",1.0,WYTree []),("BRENT-LAST",1.0,WYTree []),("HEATOIL",1.0,WYTree []),("GASOILINE",1.0,WYTree [])]),("gas",1.0,WYTree [("GAS_US_mini",1.0,WYTree []),("GAS-LAST",1.0,WYTree [])])]),("currencies",1.0,WYTree [("usd-fx",1.0,WYTree [("INR-SGX",1.0,WYTree []),("EUR",1.0,WYTree []),("GBP",1.0,WYTree [])]),("eur-fx",1.0,WYTree [("EUR",1.0,WYTree []),("EURGBP",1.0,WYTree [])])]),("equities",1.0,WYTree [("us-equities",1.0,WYTree [("SP500_mini",1.0,WYTree []),("R1000",1.0,WYTree [])]),("eu-equities",1.0,WYTree [("AEX",1.0,WYTree []),("DAX",1.0,WYTree [])]),("asia-equities",1.0,WYTree [("KOSPI",1.0,WYTree [])])]),("vol",1.0,WYTree [("VIX",1.0,WYTree []),("V2X",1.0,WYTree []),("VNKI",1.0,WYTree [])])])]
 userWeightRequest :: WYTree -> IO WYTree
 userWeightRequest t@(WYTree ts) = do
+  --putStrLn $ "Child nodes of " ++ show t ++ ": " ++ show ts
+  putStrLn $ "n:    " ++ show (length ts)
   equal <- isEqualWeight
   if equal
     then return $ equalWYTree t
-    else do
+  else do
       let n = length ts
       weights <- promptForWeights n
-      let normalizedWeights = map (/ sum weights) weights
-      return $ weightCalNonEqual normalizedWeights t
+      let normalizedWeights = normalize weights
+      return $ weightCalculator' normalizedWeights t
 
-weightCalNonEqual :: [Float] -> WYTree -> WYTree
-weightCalNonEqual ws (WYTree ts) = WYTree $ zipWith weightCal ws ts
+
+normalize :: [Float] -> [Float]
+normalize ws =
+  let total = sum ws
+  in map (/total) ws
+
+  --used for non equal weight
+weightCalculator' :: [Float] -> WYTree -> WYTree
+weightCalculator' weights (WYTree ts) = WYTree $ zipWith applyWeight weights ts
   where
-    weightCal w (name, _, t) = (name, w, weightCalNonEqual ws t)
+    applyWeight w (name, _, t) = (name, w, weightCalculator' weights t)
 
 promptForWeights :: Int -> IO [Float]
 promptForWeights n = do
   putStrLn "Please enter the weight for each subtree:"
   replicateM n getFloat
-  where
-    getFloat = do
-      putStr "> "
-      hFlush stdout
-      readLn
-
+    where
+      getFloat = do
+        putStr "> "
+        hFlush stdout
+        readLn
       
---------
-a = WeightedYamlTree 1.0 [("bonds",WeightedYamlTree 0.5 [("long-bonds",
-                                                          WeightedYamlTree 0.5 [("us-long-bonds",
-                                                                                 WeightedYamlTree 0.25 [("US10",WeightedYamlTree 0.0833 []),
-                                                                                                        ("US20",WeightedYamlTree 0.0833 []),
-                                                                                                        ("US30",WeightedYamlTree 0.0833 [])]),
-                                                                                ("eu-long-bonds",WeightedYamlTree 0.25 [])])]),
-                            ("energies",
-                            WeightedYamlTree 0.5 [("oil",
-                                                    WeightedYamlTree 0.16 [("CRUDE_W_mini",WeightedYamlTree 0.16 [])]),
-                                                  ("gas",
-                                                    WeightedYamlTree 0.16 [("GAS_US_mini",WeightedYamlTree 0.08 []),
-                                                                          ("GAS-LAST",WeightedYamlTree 0.08 [])]),
-                                                  ("KR3",WeightedYamlTree 0.16 [])]
-                            )]
+
 isEqualWeight :: IO Bool
 isEqualWeight = do
   putStrLn "Do you want equal weights for the subtrees? (y/n)"
@@ -475,8 +463,11 @@ main = do
     yamlValue <- parse "instruments-hierarchy.yaml"
     let yamlTree' = convertToYAMLTree yamlValue
     let yamlTree = postProcessYamlTree yamlTree'
-    print'<- userWeightRequest $ equalWYTree $ traverseTree yamlTree
+    -- print'<- userWeightRequest $ equalWYTree $ traverseTree yamlTree
+    -- print print'
+    print'<- userWeightRequest $ traverseTree' yamlTree
     print print'
+
     --print (yamlTree)
     -- --let yamlTree = YamlTree [("a", YamlTree [("b", YamlTree [("c", YamlTree []), ("d", YamlTree [])]), ("e", YamlTree [])]), ("f", YamlTree [])]
     -- -- print (treeToList yamlTree)
@@ -623,3 +614,18 @@ main = do
 --   | otherwise =
 --     let subtrees = concatMap (\(_, tree) -> treeToList tree) trees
 
+--------
+-- a = WeightedYamlTree 1.0 [("bonds",WeightedYamlTree 0.5 [("long-bonds",
+--                                                           WeightedYamlTree 0.5 [("us-long-bonds",
+--                                                                                  WeightedYamlTree 0.25 [("US10",WeightedYamlTree 0.0833 []),
+--                                                                                                         ("US20",WeightedYamlTree 0.0833 []),
+--                                                                                                         ("US30",WeightedYamlTree 0.0833 [])]),
+--                                                                                 ("eu-long-bonds",WeightedYamlTree 0.25 [])])]),
+--                             ("energies",
+--                             WeightedYamlTree 0.5 [("oil",
+--                                                     WeightedYamlTree 0.16 [("CRUDE_W_mini",WeightedYamlTree 0.16 [])]),
+--                                                   ("gas",
+--                                                     WeightedYamlTree 0.16 [("GAS_US_mini",WeightedYamlTree 0.08 []),
+--                                                                           ("GAS-LAST",WeightedYamlTree 0.08 [])]),
+--                                                   ("KR3",WeightedYamlTree 0.16 [])]
+--                             )]
