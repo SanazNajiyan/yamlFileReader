@@ -7,6 +7,7 @@ import Data.List (isPrefixOf)
 import Data.List.Split as L
 import Data.Function (on)
 import Control.Monad as M (void)
+import System.IO (hFlush, stdout)
 import Control.Monad as M (guard)
 import qualified Test.QuickCheck as Q
 import Test.QuickCheck (Arbitrary(..), Gen, suchThat)
@@ -344,7 +345,7 @@ longestPath tree =
 --q9:Now, please implement a variant of the YamlTree datatype that we call a WeightedYamlTree: a YamlTree that further carries a Float for the relative weight of each (proper) subtree (each of which is again a WeightedYamlTree).
 data WeightedYamlTree = WeightedYamlTree Float [(String, WeightedYamlTree)] deriving Show
 --this would be more appropriate as it allows the weight to be associated with any subtree, not just child nodes. I need to ask this
---data WeightedYamlTree = WeightedYamlTree [(String, Float, WeightedYamlTree)] deriving Show
+data WYTree = WYTree [(String, Float, WYTree)] deriving Show
 --q10: Define a parameterized datatype data PYamlTree a = ... such that YamlTree and WeightedYamlTree could be reimplemented as special cases of it. Please make PYamlTree an instance of Functor and use fmap to define a function that "throws away the weights" of a WeightedYamlTree to produce the underlying YamlTree.
 data PYamlTree a = PYamlTree a [(String, PYamlTree a)] deriving Show
 --To make PYamlTree an instance of Functor, we can define the following fmap function:
@@ -377,55 +378,91 @@ find' key (YamlTree ts) = any (checkKey key) ts || any (find' key . snd) ts
 --from the user as no weighting decision has the be made. The whole tree should
 --be assigned weight 1
 -- Depth-first traversal of YamlTree to convert it into a WeightedYamlTree
+traverseTree :: YamlTree -> WYTree
+traverseTree (YamlTree ts) = 
+  let traverseSubtree (name, subtree) = (name, 1.0, traverseTree' subtree)
+  in WYTree [("root", 1.0, WYTree $ map traverseSubtree ts)]
 
-traverseTreeUntilLeaf :: YamlTree -> IO WeightedYamlTree
-traverseTreeUntilLeaf (YamlTree []) = do
-  putStrLn "Reached leaf node."
-  weight <- askSubtreeWeight
-  return $ WeightedYamlTree weight []
-traverseTreeUntilLeaf (YamlTree ts) = do
-  putStrLn "Non-leaf node. Enter weight for this level:"
-  weight <- askSubtreeWeight
-  subtrees' <- mapM (\(_, t) -> traverseTreeUntilLeaf t) ts
-  let subnodes = zip (map fst ts) subtrees'
-  return $ WeightedYamlTree weight subnodes
+traverseTree' :: YamlTree -> WYTree
+traverseTree' (YamlTree ts) = 
+  let traverseSubtree name subtree = (name, 1.0, traverseTree' subtree)
+  in WYTree $ map (\(name, subtree) -> traverseSubtree name subtree) ts
 
-askSubtreeWeight :: IO Float
-askSubtreeWeight = do
-  putStrLn "Please enter the weight for this subtree:"
-  input <- getLine
-  case readFloat input of
-    Just weight -> return weight
-    Nothing     -> do
-                     putStrLn "Invalid input. Please enter a float."
-                     askSubtreeWeight
-readFloat :: String -> Maybe Float
-readFloat s = case reads s of
-                [(x, "")] -> Just x
-                _         -> Nothing
-
-traverseTree :: YamlTree -> IO WeightedYamlTree
-traverseTree yamlTree = traverseTree' 1.0 yamlTree                     
-traverseTree' :: Float -> YamlTree -> IO WeightedYamlTree
-traverseTree' w (YamlTree ts) = do
+equalWYTree :: WYTree -> WYTree
+equalWYTree (WYTree ts) =
   let n = length ts
-  if n == 1
-    then do
-      let [(name, subtree)] = ts
-      wyt <- traverseTreeUntilLeaf subtree
-      return $ WeightedYamlTree w [(name, wyt)]
-    else do
-      weights <- case n of
-        2 -> return [0.5, 0.5]
-        3 -> return [0.33, 0.33, 0.34]
-        _ -> replicateM n askSubtreeWeight
-      let totalWeight = sum weights
-          normalizedWeights = map (/ totalWeight) weights
-      subtrees <- mapM (\((name, t), w') -> do
-        wyt <- traverseTree' w' t
-        return (name, wyt)) (zip ts normalizedWeights)
-      return $ WeightedYamlTree w subtrees
+      equalWeight = 1.0 / fromIntegral n
+      subtrees = map (\(name, _, t) -> (name, equalWeight, equalWYTree (weightCalculator equalWeight t))) ts
+  in WYTree subtrees
 
+weightCalculator :: Float -> WYTree -> WYTree
+weightCalculator parentWeight (WYTree ts) =
+  let n = length ts
+      equalWeight = parentWeight / fromIntegral n
+      subtrees = map (\(name, _, t) -> (name, equalWeight, equalWYTree (weightCalculator equalWeight t))) ts
+  in WYTree subtrees
+
+-- userWeightRequest :: WYTree -> IO WYTree
+-- userWeightRequest tree = do
+--   eqWeight <- isEqualWeight
+--   if eqWeight
+--     then return $ equalWYTree tree
+--     else return tree
+userWeightRequest :: WYTree -> IO WYTree
+userWeightRequest t@(WYTree ts) = do
+  equal <- isEqualWeight
+  if equal
+    then return $ equalWYTree t
+    else do
+      let n = length ts
+      weights <- promptForWeights n
+      let normalizedWeights = map (/ sum weights) weights
+      return $ weightCalNonEqual normalizedWeights t
+
+weightCalNonEqual :: [Float] -> WYTree -> WYTree
+weightCalNonEqual ws (WYTree ts) = WYTree $ zipWith weightCal ws ts
+  where
+    weightCal w (name, _, t) = (name, w, weightCalNonEqual ws t)
+
+promptForWeights :: Int -> IO [Float]
+promptForWeights n = do
+  putStrLn "Please enter the weight for each subtree:"
+  replicateM n getFloat
+  where
+    getFloat = do
+      putStr "> "
+      hFlush stdout
+      readLn
+
+      
+--------
+a = WeightedYamlTree 1.0 [("bonds",WeightedYamlTree 0.5 [("long-bonds",
+                                                          WeightedYamlTree 0.5 [("us-long-bonds",
+                                                                                 WeightedYamlTree 0.25 [("US10",WeightedYamlTree 0.0833 []),
+                                                                                                        ("US20",WeightedYamlTree 0.0833 []),
+                                                                                                        ("US30",WeightedYamlTree 0.0833 [])]),
+                                                                                ("eu-long-bonds",WeightedYamlTree 0.25 [])])]),
+                            ("energies",
+                            WeightedYamlTree 0.5 [("oil",
+                                                    WeightedYamlTree 0.16 [("CRUDE_W_mini",WeightedYamlTree 0.16 [])]),
+                                                  ("gas",
+                                                    WeightedYamlTree 0.16 [("GAS_US_mini",WeightedYamlTree 0.08 []),
+                                                                          ("GAS-LAST",WeightedYamlTree 0.08 [])]),
+                                                  ("KR3",WeightedYamlTree 0.16 [])]
+                            )]
+isEqualWeight :: IO Bool
+isEqualWeight = do
+  putStrLn "Do you want equal weights for the subtrees? (y/n)"
+  choice <- getLine
+  return $ choice == "y"
+
+nonEqualWeight :: Float -> Int -> IO [Float]
+nonEqualWeight weight n = do
+  putStrLn $ "Enter " ++ show n ++ " relative weights separated by space:"
+  weights <- map read . words <$> getLine
+  let totalWeight = sum weights
+  return $ map (/ totalWeight) weights
+-------
 --q13
 
 --q13:Now, please write a pretty printer for WeightedYamlTrees that produces
@@ -435,9 +472,11 @@ traverseTree' w (YamlTree ts) = do
 --------------------------------------------------------------------------------
 main :: IO ()
 main = do
-    yamlValue <- parse "output3.yaml"
+    yamlValue <- parse "instruments-hierarchy.yaml"
     let yamlTree' = convertToYAMLTree yamlValue
     let yamlTree = postProcessYamlTree yamlTree'
+    print'<- userWeightRequest $ equalWYTree $ traverseTree yamlTree
+    print print'
     --print (yamlTree)
     -- --let yamlTree = YamlTree [("a", YamlTree [("b", YamlTree [("c", YamlTree []), ("d", YamlTree [])]), ("e", YamlTree [])]), ("f", YamlTree [])]
     -- -- print (treeToList yamlTree)
@@ -448,8 +487,8 @@ main = do
 --------q8
     -- print(longestPath yamlTree)
     -- print (find' "us-long-bonds" yamlTree)
-    output <- traverseTree yamlTree
-    print output
+    -- output <- traverseTree yamlTree
+    -- print output
     -- print ("leafDict" ++ " :" ++ " ")
     -- print (leafDict (treeToList yamlTree) [])
     --"leafDict= [("US10 US20 US30",1,["bonds","long-bonds","us-long-bonds","US10 US20 US30"]),("KR10",1,["bonds","long-bonds","KR10"]),("OAT BTP",1,["bonds","long-bonds","eu-short-bonds","OAT BTP"]),("US2 US3 US5",1,["bonds","short-bonds","us-short-bonds","US2 US3 US5"]),("SHATZ BTP3",1,["bonds","short-bonds","eu-short-bonds","SHATZ BTP3"]),("KR3",1,["bonds","short-bonds","KR3"]),("EURIBOR FED",1,["bonds","STIRs","EURIBOR FED"]),("CRUDE_W_mini BRENT-LAST HEATOIL GASOILINE",1,["energies","oil","CRUDE_W_mini BRENT-LAST HEATOIL GASOILINE"]),("GAS_US_mini GAS-LAST",1,["energies","gas","GAS_US_mini GAS-LAST"]),("INR-SGX",1,["currencies","usd-fx","INR-SGX"]),("EUR",1,["currencies","usd-fx","EUR"]),("GBP",1,["currencies","usd-fx","GBP"]),("EUR",1,["currencies","eur-fx","EUR"]),("EURGBP",1,["currencies","eur-fx","EURGBP"]),("SP500_mini R1000",1,["equities","us-equities","SP500_mini R1000"]),("AEX DAX",1,["equities","eu-equities","AEX DAX"]),("KOSPI",1,["equities","asia-equities","KOSPI"]),("VIX V2X VNKI",1,["vol","VIX V2X VNKI"])]
