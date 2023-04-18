@@ -412,10 +412,20 @@ userWeightRequest t@(WYTree ts) = do
   else do
       let n = length ts
       weights <- promptForWeights n
-      let normalizedWeights = normalize weights
-      return $ weightCalculator' normalizedWeights t
+      --let normalizedWeights = normalize weights
+      return $ weightCalculator' weights t
 
+applyWeight :: [Float] -> (String, Float, WYTree) -> (String, Float, WYTree)
+applyWeight weights (name, _, t) =
+  let normalizedWeights = normalize weights
+      weightedSubtree = weightCalculator' normalizedWeights t
+  in (name, head normalizedWeights, weightedSubtree)
 
+splitWeights :: [Float] -> Int -> [[Float]]
+splitWeights ws n = chunksOf n $ normalize ws
+
+--at each level we ask the user to input the weight as many times as existing subtrees
+      
 normalize :: [Float] -> [Float]
 normalize ws =
   let total = sum ws
