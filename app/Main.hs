@@ -378,63 +378,101 @@ find' key (YamlTree ts) = any (checkKey key) ts || any (find' key . snd) ts
 -- Depth-first traversal of YamlTree to convert it into a WeightedYamlTree
 
 
-traverseTree :: YamlTree -> WYTree
-traverseTree (YamlTree ts) =
-  let traverseSubtree (name, subtree) = (name, 1.0, traverseTree' subtree)
-  in WYTree [("root", 1.0, WYTree $ map traverseSubtree ts)]
+-- traverseTree :: YamlTree -> WYTree
+-- traverseTree (YamlTree ts) =
+--   let traverseSubtree (name, subtree) = (name, 1.0, traverseTree' subtree)
+--   in WYTree [("root", 1.0, WYTree $ map traverseSubtree ts)]
 
-traverseTree' :: YamlTree -> WYTree
-traverseTree' (YamlTree ts) =
-  let traverseSubtree name subtree = (name, 1.0, traverseTree' subtree)
-  in WYTree $ map (\(name, subtree) -> traverseSubtree name subtree) ts
---test = WYTree [("root",1.0,WYTree [("bonds",1.0,WYTree [("long-bonds",1.0,WYTree [("us-long-bonds",1.0,WYTree [("US10",1.0,WYTree []),("US20",1.0,WYTree []),("US30",1.0,WYTree [])]),("KR10",1.0,WYTree []),("eu-short-bonds",1.0,WYTree [("OAT",1.0,WYTree []),("BTP",1.0,WYTree [])])]),("short-bonds",1.0,WYTree [("us-short-bonds",1.0,WYTree [("US2",1.0,WYTree []),("US3",1.0,WYTree []),("US5",1.0,WYTree [])]),("eu-short-bonds",1.0,WYTree [("SHATZ",1.0,WYTree []),("BTP3",1.0,WYTree [])]),("KR3",1.0,WYTree [])]),("STIRs",1.0,WYTree [("EURIBOR",1.0,WYTree []),("FED",1.0,WYTree [])])]),("energies",1.0,WYTree [("oil",1.0,WYTree [("CRUDE_W_mini",1.0,WYTree []),("BRENT-LAST",1.0,WYTree []),("HEATOIL",1.0,WYTree []),("GASOILINE",1.0,WYTree [])]),("gas",1.0,WYTree [("GAS_US_mini",1.0,WYTree []),("GAS-LAST",1.0,WYTree [])])]),("currencies",1.0,WYTree [("usd-fx",1.0,WYTree [("INR-SGX",1.0,WYTree []),("EUR",1.0,WYTree []),("GBP",1.0,WYTree [])]),("eur-fx",1.0,WYTree [("EUR",1.0,WYTree []),("EURGBP",1.0,WYTree [])])]),("equities",1.0,WYTree [("us-equities",1.0,WYTree [("SP500_mini",1.0,WYTree []),("R1000",1.0,WYTree [])]),("eu-equities",1.0,WYTree [("AEX",1.0,WYTree []),("DAX",1.0,WYTree [])]),("asia-equities",1.0,WYTree [("KOSPI",1.0,WYTree [])])]),("vol",1.0,WYTree [("VIX",1.0,WYTree []),("V2X",1.0,WYTree []),("VNKI",1.0,WYTree [])])])]
+-- traverseTree' :: YamlTree -> WYTree
+-- traverseTree' (YamlTree ts) =
+--   let traverseSubtree name subtree = (name, 1.0, traverseTree' subtree)
+--   in WYTree $ map (\(name, subtree) -> traverseSubtree name subtree) ts
+-- --test = WYTree [("root",1.0,WYTree [("bonds",1.0,WYTree [("long-bonds",1.0,WYTree [("us-long-bonds",1.0,WYTree [("US10",1.0,WYTree []),("US20",1.0,WYTree []),("US30",1.0,WYTree [])]),("KR10",1.0,WYTree []),("eu-short-bonds",1.0,WYTree [("OAT",1.0,WYTree []),("BTP",1.0,WYTree [])])]),("short-bonds",1.0,WYTree [("us-short-bonds",1.0,WYTree [("US2",1.0,WYTree []),("US3",1.0,WYTree []),("US5",1.0,WYTree [])]),("eu-short-bonds",1.0,WYTree [("SHATZ",1.0,WYTree []),("BTP3",1.0,WYTree [])]),("KR3",1.0,WYTree [])]),("STIRs",1.0,WYTree [("EURIBOR",1.0,WYTree []),("FED",1.0,WYTree [])])]),("energies",1.0,WYTree [("oil",1.0,WYTree [("CRUDE_W_mini",1.0,WYTree []),("BRENT-LAST",1.0,WYTree []),("HEATOIL",1.0,WYTree []),("GASOILINE",1.0,WYTree [])]),("gas",1.0,WYTree [("GAS_US_mini",1.0,WYTree []),("GAS-LAST",1.0,WYTree [])])]),("currencies",1.0,WYTree [("usd-fx",1.0,WYTree [("INR-SGX",1.0,WYTree []),("EUR",1.0,WYTree []),("GBP",1.0,WYTree [])]),("eur-fx",1.0,WYTree [("EUR",1.0,WYTree []),("EURGBP",1.0,WYTree [])])]),("equities",1.0,WYTree [("us-equities",1.0,WYTree [("SP500_mini",1.0,WYTree []),("R1000",1.0,WYTree [])]),("eu-equities",1.0,WYTree [("AEX",1.0,WYTree []),("DAX",1.0,WYTree [])]),("asia-equities",1.0,WYTree [("KOSPI",1.0,WYTree [])])]),("vol",1.0,WYTree [("VIX",1.0,WYTree []),("V2X",1.0,WYTree []),("VNKI",1.0,WYTree [])])])]
 
-userWeightRequest :: WYTree -> IO WYTree
-userWeightRequest t@(WYTree ts) = do
-  putStrLn $ "n:    " ++ show (length ts)
+-- userWeightRequest :: YamlTree -> IO WYTree
+-- userWeightRequest (YamlTree []) = return (WYTree [])
+-- userWeightRequest yamlTree@(YamlTree [(name,ytree)]) = do
+--   equal <- isEqualWeight
+--   normalizeWeights name 1.0 yamlTree equal
+userWeightRequest :: YamlTree -> IO WYTree
+-- userWeightRequest (YamlTree []) = return (WYTree [])
+userWeightRequest yamlTree@(YamlTree ((name, yamlTree'):rest)) = do
   equal <- isEqualWeight
-  normalizeWeights 1.0 t equal
---general normalization for non/equal weight distribution
-normalizeWeights :: Float -> WYTree -> Bool -> IO WYTree
-normalizeWeights parentWeight (WYTree ts) equal = do
-  let n = length ts
-      userTotalWeight = sum $ map (\(_, w, _) -> w) ts
-  userGivenWeight <- if equal
-                     then return $ parentWeight / fromIntegral n  --IO Float
-                     else promptForWeights n
-  let calculateAdjustedWeight userGivenWeight = if equal then (parentWeight / userTotalWeight) else parentWeight * (userGivenWeight / userTotalWeight)  ---1 * 1/n 
-  normalizedTs <- mapM (\(name, _, t) -> do
-                          normalizedT <- normalizeWeights (calculateAdjustedWeight userGivenWeight) t equal
-                          return (name, calculateAdjustedWeight userGivenWeight , normalizedT)) ts
-  return $ WYTree normalizedTs
-  -- equalWYTree :: WYTree -> WYTree
-  -- equalWYTree (WYTree ts) =
-  --   let n = length ts
-  --       equalWeight = 1.0 / fromIntegral n
-  --       subtrees = map (\(name, _, t) -> (name, equalWeight, equalWYTree (weightCalculator equalWeight t))) ts
-  --   in WYTree subtrees
-  -- --merely used for equalWeights
-  -- weightCalculator :: Float -> WYTree -> WYTree
-  -- weightCalculator parentWeight (WYTree ts) =
-  --   let n = length ts
-  --       equalWeight = parentWeight / fromIntegral n
-  --       subtrees = map (\(name, _, t) -> (name, equalWeight, equalWYTree (weightCalculator equalWeight t))) ts
-  
+  normalizeWeights name 1.0 yamlTree equal
 
---here I should have recursion. after asking 2 quesitons: 1- what is the weight of this node 2- do you want equal weights for this? if not, then I recurse
-promptForWeights :: Int -> IO Float
-promptForWeights 0 = return 0.0 
-promptForWeights n = do
-  putStrLn "Please enter the weight of this node?"
-  weight <- readLn
-  equalSubtrees <- isEqualWeight
-  if equalSubtrees then return weight
-  else
-    promptForWeights (n-1)
+
+--general normalization for non/equal weight distribution
+-- normalizeWeights :: Float -> YamlTree -> Bool -> IO WYTree
+-- normalizeWeights parentWeight (YamlTree cs) equal = do
+--   -- If equal flag is true, then calculate equal weights for each subtree
+--   if equal 
+--   then do
+--     let weight = parentWeight / fromIntegral (length cs) -- Calculate equal weight
+--     subtrees <- mapM (\(_, yamlTree) -> normalizeWeights weight yamlTree equal) cs -- Recursively call normalizeWeights on subtrees
+--     return $ WYTree $ zipWith (\(n, _) t -> (n, weight, t)) cs subtrees -- Construct the WYTree by zipping the subtree with the weights and name of the subtree.
+--   -- If equal flag is false, then prompt user to input weights for each subtree
+--   else do
+--     inputs <- promptForWeights (length cs)
+--     let totalWeight = sum inputs -- Calculate the total weight
+--     let weights = map (\x -> (x / totalWeight) * parentWeight) inputs -- Calculate the weight of each subtree based on the user input and the parent weight
+--     let zipped = zip cs weights -- Pair each subtree with its corresponding weight
+--     equal' <- isEqualWeight -- Check if the subtrees should be equally weighted or not
+--     subtrees <- mapM (\((name, yamlTree), weight) -> do
+--         wyTree <- normalizeWeights weight yamlTree equal' -- Recursively call normalizeWeights on the subtree
+--         return (name, weight, wyTree)) zipped -- Construct the WYTree by zipping the subtree with the weights and name of the subtree.
+--     return (WYTree subtrees) -- Return the WYTree
+
+-- promptForWeights :: Int -> IO [Float]
+-- promptForWeights 0 = return [0.0] 
+-- promptForWeights n = do
+--   putStrLn "Please enter weights for this subtree:"
+--   putStrLn $ "ENTER  " ++ show n ++ "   in total"
+--   replicateM n getFloat
+--     where
+--       getFloat = do
+--         putStr "> "
+--         hFlush stdout
+--         readLn
+normalizeWeights :: String -> Float -> YamlTree -> Bool -> IO WYTree
+normalizeWeights parentName parentWeight (YamlTree []) equal = return (WYTree [])
+normalizeWeights parentName parentWeight (YamlTree cs) equal = do
+  if equal
+    then do
+      let weight = parentWeight / fromIntegral (length cs)
+      subtrees <- mapM (\(name, yamlTree) -> normalizeWeights name weight yamlTree equal) cs
+      return $ WYTree $ zipWith (\(n, _) t -> (n, weight, t)) cs subtrees
+    else do
+      inputs <- promptForWeights parentName (length cs)
+      let totalWeight = sum inputs
+      let weights = map (\x -> (x / totalWeight) * parentWeight) inputs
+      let zipped = zip cs weights
+      equal' <- isEqualWeight
+      subtrees <- mapM (\((name, yamlTree), weight) -> do
+        wyTree <- normalizeWeights name weight yamlTree equal'
+        return (name, weight, wyTree)) zipped
+      return (WYTree subtrees)
+
+promptForWeights :: String -> Int -> IO [Float]
+promptForWeights parentName n = do
+  putStrLn $ "Please enter the weights for the subtree(s) of parent node: " ++ parentName
+  putStrLn $ "Please enter " ++ show n ++ " value(s), separated by spaces:"
+  getFloats
+    where
+      getFloats = do
+        putStr "> "
+        hFlush stdout
+        input <- getLine
+        let parsed = map read $ words input
+        if length parsed /= n
+          then do
+            putStrLn $ "Please enter exactly " ++ show n ++ " values."
+            getFloats
+          else return parsed
+  
 
 isEqualWeight :: IO Bool
 isEqualWeight = do
-  putStrLn "Do all subtrees have equal weights? (y/n)"
+  putStrLn "Do all children of this node have equal weights? (y/n)"
   ans <- getLine
   case ans of
     "y" -> return True
@@ -470,7 +508,7 @@ main = do
     yamlValue <- parse "instruments-hierarchy.yaml"
     let yamlTree' = convertToYAMLTree yamlValue
     let yamlTree = postProcessYamlTree yamlTree'
-    print'<- userWeightRequest $ traverseTree' yamlTree
+    print'<- userWeightRequest yamlTree
     print print'
     -- wyTree <- normalizeWeights 1.0 (traverseTree' yamlTree) True
     -- putStr $ uglyPrint' wyTree
