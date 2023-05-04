@@ -16,6 +16,7 @@ import Test.QuickCheck.Monadic as Q (assert, monadicIO, pick, pre, run)
 import Control.Applicative as AP
 import Control.Monad (replicateM)
 import Data.Yaml.Pretty
+import Text.Printf
 import Data.List as L (maximumBy, groupBy, sortOn)
 import Data.Ord (comparing)
 import Control.Monad as MO (when)
@@ -451,7 +452,7 @@ normalizeWeights parentName parentWeight (YamlTree cs) equal = do
         wyTree <- normalizeWeights name weight yamlTree equal'
         return (name, weight, wyTree)) zipped
       return (WYTree subtrees)
-
+--don't forget to fix the root question as a notification
 promptForWeights :: String -> Int -> IO [Float]
 promptForWeights parentName n = do
   putStrLn $ "Please enter the weights for the subtree(s) of parent node: " ++ parentName
@@ -485,14 +486,23 @@ isEqualWeight = do
 --q13:Now, please write a pretty printer for WeightedYamlTrees that produces
 --"instruments_hierarchy_weighted.yaml" for the YamlTree corresponding to
 --"instruments_hierarchy_regular.yaml", for example. (Again, no hard-coding!)
+----e.g.##            us-long-bonds: 0.022/instruments - 0.11/bonds - 0.33/long-bonds
 
+-- TODO:
+-- print first line
 uglyPrint' :: WYTree -> String
-uglyPrint' (WYTree x) = concatMap (\y -> uglyPrint y [("instruments", 1.0)]) x
---find the function to pretty print the float!!!
+uglyPrint' (WYTree x) = "instrument_weights:\n" ++ concatMap (\y -> uglyPrint y [("instruments", 1.0)]) x
+-- --find the function to pretty print the float!!!
+
+-- TODO:
+-- remove pending '-'
+-- tricky number formatting
+-- The desired output is inconsistent, compare line 11 with 15 for example.
+-- We opt to print all parent nodes
 uglyPrint :: (String, Float, WYTree) -> [(String, Float)] -> String
 uglyPrint (name, weight, (WYTree ts)) parents = let
   depth = length parents
-  portionPerParent = show weight ++ "/" ++ "instruments" -- undefined--go through parent list and do calculation and then printing
+  portionPerParent = replicatePortions parents weight -- format the weight here
   indentation = concat $ replicate depth "    "
   isLeaf = length ts == 0
   comment = if isLeaf
@@ -500,19 +510,45 @@ uglyPrint (name, weight, (WYTree ts)) parents = let
     else "##"
   in
     comment ++ indentation ++ name ++ ": " ++ portionPerParent ++ "\n" ++
-      concatMap (\tree -> uglyPrint tree ((name, weight) : parents)) ts
+      concatMap (\tr -> uglyPrint tr (parents ++ [(name, weight)])) ts
 
+formatFloat :: Float -> String
+formatFloat f = printf "%.2f" f
+
+replicatePortions :: [(String, Float)] -> Float -> String
+replicatePortions [] _ = ""
+replicatePortions ((parent, parentWeight):rest) weight =
+  " - " ++ formatFloat (weight/parentWeight) ++ "/" ++ parent ++ replicatePortions rest weight
+--q.14
+-- Finally, put all the pieces together into an interactive program that
+-- - reads in a yaml file at a user-specified path (e.g. "/home/henkie/generated_configs/instrument_hierarchy.yaml")
+-- - parses the yaml (like our "instruments-hierarchy.yaml") into a YamlTree
+-- - regularizer into a regular YamlTree, producing a YamlTree that would pretty print to "instruments-hierarchy-regular.yaml" for our particular example
+-- - checks for overlapping leaf labels and prints warnings and (interactively) converts the regular YamlTree into a WeightedYamlTree, in such a way that our example would generate the interaction in "instruments-interaction.log"
 --------------------------------------------------------------------------------
 main :: IO ()
 main = do
-    yamlValue <- parse "instruments-hierarchy.yaml"
-    let yamlTree' = convertToYAMLTree yamlValue
-    let yamlTree = postProcessYamlTree yamlTree'
-    print'<- userWeightRequest yamlTree
-    print print'
-    -- wyTree <- normalizeWeights 1.0 (traverseTree' yamlTree) True
+    -- yamlValue <- parse "instruments-hierarchy.yaml"
+
+    -- let yamlTree' = convertToYAMLTree yamlValue
+    -- let yamlTree = postProcessYamlTree yamlTree'
+    -- -- print'<- userWeightRequest yamlTree
+    -- -- print print'
+    -- --normalizeWeights :: String -> Float -> YamlTree -> Bool -> IO WYTree
+
+    -- wyTree <- normalizeWeights "root" 1.0 yamlTree True
     -- putStr $ uglyPrint' wyTree
+    --print wyTree
     -- print print'
+----------------final questions
+-- - reads in a yaml file at a user-specified path (e.g. "/home/henkie/generated_configs/instrument_hierarchy.yaml")
+-- - parses the yaml (like our "instruments-hierarchy.yaml") into a YamlTree
+    putStrLn "Enter the path to the YAML file:"
+    path <- getLine
+    yamlValueInput <- parse path
+    let yamlTree' = convertToYAMLTree yamlValueInput
+    let yamlTree = postProcessYamlTree yamlTree'
+    print yamlTree
 
     --print (yamlTree)
     -- --let yamlTree = YamlTree [("a", YamlTree [("b", YamlTree [("c", YamlTree []), ("d", YamlTree [])]), ("e", YamlTree [])]), ("f", YamlTree [])]
@@ -675,3 +711,4 @@ main = do
 --                                                                           ("GAS-LAST",WeightedYamlTree 0.08 [])]),
 --                                                   ("KR3",WeightedYamlTree 0.16 [])]
 --                             )]
+--Sanaz TODO: q14 , finish proof, talking to Mathijs observed, rounding float, 
