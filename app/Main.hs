@@ -42,6 +42,11 @@ import GHC.Generics
 import qualified Data.Map as Map
 import Text.Read (readMaybe)
 import Debug.Trace (trace)
+import Data.List.Split (splitOn)
+import System.FilePath
+
+
+
 --We (recursively) call a YamlTree regular if all of its (proper) subtrees have the same depth and are regular themselves. Please implement a QuickCheck test that checks whether a YamlTree is regular.
 
 
@@ -465,6 +470,7 @@ main = do
     putStr "> "
     hFlush stdout
     path <- getLine
+    let normalizedPath = normalise path
     yamlValueInput <- parse path
     let yamlTree' = convertToYAMLTree yamlValueInput
     let yamlTree = postProcessYamlTree yamlTree'
@@ -473,8 +479,7 @@ main = do
     let regularized = regularize yamlTree
     yamlTreeToYamlFile "instruments-regular.yaml" regularized
     putStrLn " "
-
-    putStrLn $ "it is " ++ show (isRegular regularized) ++ " that the output YamlTree is regularize!!!" ++ " with the depth: " ++ show (depthi regularized)
+    --putStrLn $ "it is " ++ show (isRegular regularized) ++ " that the output YamlTree is regularize!!!" ++ " with the depth: " ++ show (depthi regularized)
     putStrLn " "
 -- - checks for overlapping leaf labels and prints warnings
     let leafCountsList = leafCounts' (treeToList yamlTree) []
@@ -482,11 +487,20 @@ main = do
 --and (interactively) converts the regular YamlTree into a WeightedYamlTree, in such a way that our example would generate the interaction in "instruments-interaction.log"
     putStrLn " "
     wyTree <- userWeightRequest regularized
-    print wyTree
+    --print wyTree
 --- pretty prints the resulting WeightedYamlTree to a file (e.g. "/home/henkie/generated_configs/instrument_hierarchy_weighted.yaml")
     let st = wyTreePrint' wyTree
     writeFile "instrument_hierarchy_weighted.yaml" st
-
+    let pathList = splitOn "\\" path
+    -- Remove the last element from the list
+    let keepThisPath = init pathList
+    -- Join the remaining elements back into a string
+    let keepThisPath' = unwords keepThisPath
+    let outputFilePath = keepThisPath' ++ " instrument_hierarchy_weighted.yaml"
+    let outputFilePathList = words outputFilePath
+    let final = L.intercalate "\\" outputFilePathList
+    putStrLn $ "Output was written to \"" ++ final ++ "\"." --    -- Print the modified path
+    writeFile final st
 
    --Q.quickCheck (prop_my_io_action) --cabal run yamltree= if u want to run the application  / cabal run test= if u want to run the test
   --print "hi"
@@ -513,3 +527,5 @@ main = do
 --     keyLength <- Q.choose (1, 8)
 --     key <- replicateM keyLength (Q.elements validChars)
 --     return $ if null key then "default_key" else key  
+--C:\Users\sanaz\source\yamlFileReader\instrument_hierarchy_weighted.yaml
+--"C:\Users\sanaz\instruments-hierarchy.yaml"
