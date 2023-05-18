@@ -40,6 +40,7 @@ import qualified Data.ByteString.Lazy as BSL
 import qualified Data.Yaml.Pretty as PP
 import GHC.Generics
 import qualified Data.Map as Map
+import Text.Read (readMaybe)
 import Debug.Trace (trace)
 --We (recursively) call a YamlTree regular if all of its (proper) subtrees have the same depth and are regular themselves. Please implement a QuickCheck test that checks whether a YamlTree is regular.
 
@@ -47,16 +48,7 @@ import Debug.Trace (trace)
 data YamlTree = YamlTree [(String, YamlTree)]
     deriving (Ord, Eq, Show, Generic)
 
--- WeightedYamlTree should be the same as above but with a extra Float in the constructor
--- PYamlTree should be the same as the above, but with a type variable 'a' instead of the Float
--- then, redefine YamlTree and WeightedYamlTree in terms of PYamlTree (so fill in the 'a' with either () or Float)
--- this will break the types of a few functions maybe, so maybe you'll have to add a few ()'s where the types don't match-- SOAL
--- implement Functor (fmap) for PYamlTree
--- throwOutWeights wTree = fmap (const ()) wTree
-
 --parse function reads the YAML file using the readYamlFile function from the yaml package and returns a Y.YamlValue representing the parsed YAML content
---with this implementation only YamlTree [("ExampleKey2",YamlTree [("ExampleKey2",YamlTree []),("ExampleKey2",YamlTree [])])] doesn't work!!!
---comment!!why you did it like that?
 parse :: FilePath -> IO Y.YamlValue
 parse path = do
   content <- BS.readFile path
@@ -77,7 +69,6 @@ parse path = do
 convertToYAMLTree :: Y.YamlValue -> YamlTree
 convertToYAMLTree (Y.Mapping list _) = YamlTree (L.map (\(xs,ys) -> (T.unpack xs, convertToYAMLTree ys)) list)
 convertToYAMLTree (Y.Scalar xs _ _ _) = if BS.unpack xs == ""
-  -- TODO: comment explaining why this is neccessary (otherwise we get empty nested values)
   then YamlTree []
   else YamlTree [(BS.unpack xs, YamlTree [])] --when we reach a Leaf
 convertToYAMLTree (Y.Sequence list _) = error "Yaml lists are not supported" --YamlTree $ L.map (\x -> ("-", convertToYAMLTree x)) $ V.toList $ V.fromList list --In this implementation the list argument is first converted to a Vector using V.fromList, and then V.toList is used to convert the Vector to a list.
@@ -140,7 +131,7 @@ prop_my_io_action :: YamlTree -> Q.Property
 prop_my_io_action yamltree =
   Q.monadicIO $ do
     let fileName = "output2.yaml"
-    run $ yamlTreeToYamlFile fileName yamltree
+    run $ yamlTreeToYamlFile fileName yamltree --you don't need to read and write to a file. yamltree.cabal and test.hs are updated/newly introduced
     yamlValue <- run $ parse fileName
     let result = convertToYAMLTree yamlValue
     Q.assert (result == yamltree)
@@ -176,29 +167,7 @@ arbitraryYamlTree n = do
             --key <- Q.listOf $ Q.elements validChars
             return $ if null key then "default_key" else key
 
--------------nr.2 choice with reasonable maxKeyLength and levels---------
--- instance Q.Arbitrary YamlTree where
---     arbitrary = Q.sized (arbitraryYamlTree 5)
-    
--- arbitraryYamlTree :: Int -> Int -> Gen YamlTree
--- arbitraryYamlTree 0 _ = return $ YamlTree []
--- arbitraryYamlTree n maxKeyLength = do
---     numKeys <- Q.choose (1, 3)
---     keysAndVals <- replicateM numKeys arbitraryKeyAndVal
---     return $ YamlTree (mergeTuples keysAndVals)
---     where
---         arbitraryKeyAndVal = do
---             key <- arbitraryKey 8
---             val <- if n == 1
---                        then return $ YamlTree []
---                        else arbitraryYamlTree (n-1) maxKeyLength
---             return (key, val)
--- arbitraryKey :: Int -> Gen String
--- arbitraryKey maxKeyLength = do
---     let validChars = ['A','B','c','d', 'F', 'G']
---     keyLength <- Q.choose (1, 8)
---     key <- replicateM keyLength (Q.elements validChars)
---     return $ if null key then "default_key" else key
+
             
 --Define a helper function to merge tuples with the same value of YamlTree []
 mergeTuples :: [(String, YamlTree)] -> [(String, YamlTree)]
@@ -226,7 +195,7 @@ isRegular (YamlTree kvs) =
 
 -- | QuickCheck property to test whether a given YamlTree is regular
 prop_isRegular :: YamlTree -> Bool
-prop_isRegular = isRegular
+prop_isRegular = isRegular . regularize
 -----------q6
 --Write a function that "regularizes" a YamlTree into a regular one by copying levels in the hierarchy. Please ensure that this function regularizes the YamlTree implemented by "instruments-hierarchy.yaml" to the one implemented by "instruments-hierarchy-regular.yaml". (Again, we want a generally applicable solution. No hard-coding of the example allowed.)
 -- data YamlTree = YamlTree [(String, YamlTree)]
@@ -267,21 +236,6 @@ treeToList (YamlTree trees) = trees
 -- "currencies - currencies - eur-fx - EUR""
 -- data YamlTree = YamlTree [(String, YamlTree)]
 
---how many of the same leaf! In the leafCount function, the path parameter is used to keep track of the paths to the current leaf node. When a leaf node is found, the function checks if there is already an entry in the list of leaf counts for that node (which could happen if the same leaf node appears in multiple paths in the tree). If an entry is found, the count and paths fields are updated to include the current node's count and path, respectively. If no entry is found, a new entry is added to the list with the current node's count and path.
--- leafDict :: [(String, YamlTree)] -> [String] -> [(String, Int, [String])]
--- leafDict [] _ = []
--- leafDict ((k,v):kvs) path | isLeaf(k,v) = (k, 1, reverse (k:path)) : leafDict kvs path
---                           | otherwise   = leafDict (treeToList v) (k:path) ++ leafDict kvs path
--- leafDict :: [(String, YamlTree)] -> [String] -> [(String, Int, [[String]])]
--- leafDict [] _ = []
--- leafDict ((k, v) : kvs) path
---   | isLeaf (k, v) = (k, 1, concat $ reverse (k : path) : []) : leafDict kvs path
---   | otherwise = leafDict (treeToList v) (k : path) ++ leafDict kvs path
--- leafDict :: [(String, YamlTree)] -> [String] -> [(String, Int, [String])]
--- leafDict [] _ = []
--- leafDict ((k, v) : kvs) path
---   | isLeaf (k, v) = [(k, 1, reverse (k : path))]
---   | otherwise = leafDict (treeToList v) [] ++ leafDict kvs path
 type Path = [String]
 
 leafCounts' :: [(String, YamlTree)] -> Path -> Map.Map String [Path]
@@ -289,8 +243,6 @@ leafCounts' [] _ = Map.empty
 leafCounts' ((k,v) : kvs) path
   | isLeaf (k,v) = Map.insertWith (\x y -> x ++ y) k [reverse (k : path)] (leafCounts' kvs path)
   | otherwise = Map.unionWith (\x y -> x ++ y) (leafCounts' (treeToList v) (k : path)) (leafCounts' kvs path)
-
-
 
 leafDict :: [(String, YamlTree)] -> [String] -> [(String, Int, [[String]])]
 leafDict [] _ = []
@@ -304,7 +256,6 @@ leafCount (k, v, path) kvs =
   case L.find (\(k', _, _) -> k' == k) kvs of
     Just (k', count, paths) -> (k', count + v, paths ++ [path]) : filter (\(k'', _, _) -> k'' /= k) kvs
     Nothing -> (k, v, [path]) : kvs
---[(leaf1, 1, [[path1], [path2]]), (leaf2, 1, path2)..]
 
 leafCounts :: YamlTree -> [(String, [[String]])]
 leafCounts (YamlTree []) = []
@@ -357,14 +308,14 @@ find' key (YamlTree ts) = any (checkKey key) ts || any (find' key . snd) ts
   where
     checkKey k (k', _) = k == k'
 
---answer the effect of laziness:
+----------answer of the effect of laziness:
 -- find' searches the tree as far as necessary to find the node with the
 -- specified label. This means that if the label is found early in the tree, the
 -- function will terminate quickly, without searching the rest of the tree. On
 -- the other hand. Yet, Haskell's lazy (early exit)
 -- evaluation allows for efficient searching of large trees, since it only
 -- evaluates the parts of the tree that are needed to find the label.
-----q12
+
 --q12:Write an interactive (IO) program that does a depth-first traversal of a
 --YamlTree that asks the user to specify weights for each subtree to
 --interactively convert the original YamlTree into a WeightedYamlTree. It should
@@ -378,127 +329,104 @@ find' key (YamlTree ts) = any (checkKey key) ts || any (find' key . snd) ts
 --be assigned weight 1
 -- Depth-first traversal of YamlTree to convert it into a WeightedYamlTree
 
-
--- traverseTree :: YamlTree -> WYTree
--- traverseTree (YamlTree ts) =
---   let traverseSubtree (name, subtree) = (name, 1.0, traverseTree' subtree)
---   in WYTree [("root", 1.0, WYTree $ map traverseSubtree ts)]
-
--- traverseTree' :: YamlTree -> WYTree
--- traverseTree' (YamlTree ts) =
---   let traverseSubtree name subtree = (name, 1.0, traverseTree' subtree)
---   in WYTree $ map (\(name, subtree) -> traverseSubtree name subtree) ts
--- --test = WYTree [("root",1.0,WYTree [("bonds",1.0,WYTree [("long-bonds",1.0,WYTree [("us-long-bonds",1.0,WYTree [("US10",1.0,WYTree []),("US20",1.0,WYTree []),("US30",1.0,WYTree [])]),("KR10",1.0,WYTree []),("eu-short-bonds",1.0,WYTree [("OAT",1.0,WYTree []),("BTP",1.0,WYTree [])])]),("short-bonds",1.0,WYTree [("us-short-bonds",1.0,WYTree [("US2",1.0,WYTree []),("US3",1.0,WYTree []),("US5",1.0,WYTree [])]),("eu-short-bonds",1.0,WYTree [("SHATZ",1.0,WYTree []),("BTP3",1.0,WYTree [])]),("KR3",1.0,WYTree [])]),("STIRs",1.0,WYTree [("EURIBOR",1.0,WYTree []),("FED",1.0,WYTree [])])]),("energies",1.0,WYTree [("oil",1.0,WYTree [("CRUDE_W_mini",1.0,WYTree []),("BRENT-LAST",1.0,WYTree []),("HEATOIL",1.0,WYTree []),("GASOILINE",1.0,WYTree [])]),("gas",1.0,WYTree [("GAS_US_mini",1.0,WYTree []),("GAS-LAST",1.0,WYTree [])])]),("currencies",1.0,WYTree [("usd-fx",1.0,WYTree [("INR-SGX",1.0,WYTree []),("EUR",1.0,WYTree []),("GBP",1.0,WYTree [])]),("eur-fx",1.0,WYTree [("EUR",1.0,WYTree []),("EURGBP",1.0,WYTree [])])]),("equities",1.0,WYTree [("us-equities",1.0,WYTree [("SP500_mini",1.0,WYTree []),("R1000",1.0,WYTree [])]),("eu-equities",1.0,WYTree [("AEX",1.0,WYTree []),("DAX",1.0,WYTree [])]),("asia-equities",1.0,WYTree [("KOSPI",1.0,WYTree [])])]),("vol",1.0,WYTree [("VIX",1.0,WYTree []),("V2X",1.0,WYTree []),("VNKI",1.0,WYTree [])])])]
-
--- userWeightRequest :: YamlTree -> IO WYTree
--- userWeightRequest (YamlTree []) = return (WYTree [])
--- userWeightRequest yamlTree@(YamlTree [(name,ytree)]) = do
---   equal <- isEqualWeight
---   normalizeWeights name 1.0 yamlTree equal
---TODO: please enter 1 value separated by spaces
 userWeightRequest :: YamlTree -> IO WYTree
--- userWeightRequest (YamlTree []) = return (WYTree [])
-userWeightRequest yamlTree@(YamlTree ((name, yamlTree'):rest)) = do
-  equal <- isEqualWeight
-  normalizeWeights name 1.0 yamlTree equal
+userWeightRequest yamlTree@(YamlTree cs) = normalizeWeights 1.0 yamlTree
 
 
---general normalization for non/equal weight distribution
--- normalizeWeights :: Float -> YamlTree -> Bool -> IO WYTree
--- normalizeWeights parentWeight (YamlTree cs) equal = do
---   -- If equal flag is true, then calculate equal weights for each subtree
---   if equal 
---   then do
---     let weight = parentWeight / fromIntegral (length cs) -- Calculate equal weight
---     subtrees <- mapM (\(_, yamlTree) -> normalizeWeights weight yamlTree equal) cs -- Recursively call normalizeWeights on subtrees
---     return $ WYTree $ zipWith (\(n, _) t -> (n, weight, t)) cs subtrees -- Construct the WYTree by zipping the subtree with the weights and name of the subtree.
---   -- If equal flag is false, then prompt user to input weights for each subtree
---   else do
---     inputs <- promptForWeights (length cs)
---     let totalWeight = sum inputs -- Calculate the total weight
---     let weights = map (\x -> (x / totalWeight) * parentWeight) inputs -- Calculate the weight of each subtree based on the user input and the parent weight
---     let zipped = zip cs weights -- Pair each subtree with its corresponding weight
---     equal' <- isEqualWeight -- Check if the subtrees should be equally weighted or not
---     subtrees <- mapM (\((name, yamlTree), weight) -> do
---         wyTree <- normalizeWeights weight yamlTree equal' -- Recursively call normalizeWeights on the subtree
---         return (name, weight, wyTree)) zipped -- Construct the WYTree by zipping the subtree with the weights and name of the subtree.
---     return (WYTree subtrees) -- Return the WYTree
-
--- promptForWeights :: Int -> IO [Float]
--- promptForWeights 0 = return [0.0] 
--- promptForWeights n = do
---   putStrLn "Please enter weights for this subtree:"
---   putStrLn $ "ENTER  " ++ show n ++ "   in total"
---   replicateM n getFloat
---     where
---       getFloat = do
---         putStr "> "
---         hFlush stdout
---         readLn
---TODO: fromFloat usage
-normalizeWeights :: String -> Float -> YamlTree -> Bool -> IO WYTree
-normalizeWeights parentName parentWeight (YamlTree []) equal = return (WYTree [])
-normalizeWeights parentName parentWeight (YamlTree cs) equal = do
-  if equal
-    then do
-      let weight = parentWeight / fromIntegral (length cs)
-      subtrees <- mapM (\(name, yamlTree) -> normalizeWeights name weight yamlTree equal) cs
-      return $ WYTree $ zipWith (\(n, _) t -> (n, weight, t)) cs subtrees
-    else do
-      inputs <- promptForWeights parentName (length cs)
-      let totalWeight = sum inputs
-      let weights = map (\x -> (x / totalWeight) * parentWeight) inputs
-      let zipped = zip cs weights
-      equal' <- isEqualWeight
-      subtrees <- mapM (\((name, yamlTree), weight) -> do
-        wyTree <- normalizeWeights name weight yamlTree equal'
-        return (name, weight, wyTree)) zipped
-      return (WYTree subtrees)
+--The function is introduced to check whether all the leaf nodes in a nested tree structure have the same depth
+--just the immediate subtrees of level i returns True
+isEqualWeightNested :: [[String]] -> IO Bool
+isEqualWeightNested [] = return True
+isEqualWeightNested treeStrings
+  | any (\x -> length x /= length (head treeStrings)) treeStrings = return False
+  | otherwise = return $ all (\x -> x == head treeStrings) treeStrings
+--issues: first question asked 2wice. we have a look us10,..
 --don't forget to fix the root question as a notification
-promptForWeights :: String -> Int -> IO [Float]
-promptForWeights parentName n = do
-  putStrLn $ "Please enter the weights for the subtree(s) of parent node: " ++ parentName
-  putStrLn $ "Please enter " ++ show n ++ " value(s), separated by spaces:"
-  getFloats
+--issue: Please specify relative weight of "OAT BTP"!
+promptForWeights :: [String] -> IO [Float]
+promptForWeights parents = do
+ -- putStrLn $ "Please specify relative weight of each parent:"
+  getFloats parents []
     where
-      getFloats = do
-        putStr "> "
+      getFloats [] accum = do --If the list of parents is empty, it means all weights have been collected
+        let totalWeight = sum accum
+        if totalWeight > 0
+          then do
+            let normalized = map (/ totalWeight) accum
+            let normalizedStr = L.intercalate " : " (map (printf "%.2f") normalized)
+            putStrLn $ "Your chosen weights sum to \"" ++ show totalWeight ++ "\". Normalizing to \"1\" gives relative weights of \"" ++ normalizedStr ++ "\" for \"" ++ L.intercalate " : " parents ++ "\"!"
+            return normalized
+          else do
+            putStrLn "Please specify at least one positive weight for the parents!"
+            getFloats parents []
+      getFloats (p:ps) accum = do
+        putStr $ "Please specify relative weight of \"" ++ p ++ "\"! \n> "
         hFlush stdout
         input <- getLine
-        let parsed = map read $ words input
-        if length parsed /= n
-          then do
-            putStrLn $ "Please enter exactly " ++ show n ++ " values."
-            getFloats
-          else return parsed
-  
+        let parsed = readMaybe input :: Maybe Float
+        case parsed of
+          Just w -> if w > 0
+                      then getFloats ps (w:accum)
+                      else do
+                        putStrLn "Please specify a positive weight for the parent!"
+                        getFloats (p:ps) accum
+          Nothing -> do
+            putStrLn "Please specify a valid number for the weight of the parent!"
+            getFloats (p:ps) accum
 
-isEqualWeight :: IO Bool
-isEqualWeight = do
-  putStrLn "Do all children of this node have equal weights? (y/n)"
+
+isEqualWeight :: [String] -> IO Bool
+isEqualWeight parents = do
+  putStrLn " "
+  putStrLn $ "Equal weight " ++ L.intercalate ": " parents ++ " ? (Type \"no\" or \"NO\" or \"n\" or \"N\" to give custom weights. Any other input will result in equal weights.)"
+  putStr "> "
+  hFlush stdout
   ans <- getLine
-  case ans of
-    "y" -> return True
+  let ans' = map C.toLower ans
+  case ans' of
     "n" -> return False
-    _ -> do
-      putStrLn "Invalid answer. Please answer y/n."
-      isEqualWeight
---q13
+    "no" -> return False
+    _ -> return True
+
+
+normalizeWeights :: Float -> YamlTree -> IO WYTree
+normalizeWeights _ (YamlTree []) = return (WYTree [])
+normalizeWeights parentWeight (YamlTree cs) = do
+  equal <- isEqualWeight (map fst cs)
+  if equal
+    then do
+      putStrLn $ "Equal weighting \"" ++ L.intercalate " : " (map fst cs) ++ "\"!"
+      let subTrees = map snd cs
+      let treeStrings = map (map fst . treeToList . snd) cs
+      equalNested <- isEqualWeightNested treeStrings
+      let weight = parentWeight / fromIntegral (length cs)
+      subtrees <- mapM (\(name, yamlTree) -> normalizeWeights weight yamlTree) cs
+      return $ WYTree $ zipWith (\((n, _), ts) t -> (n, weight, t)) (zip cs treeStrings) subtrees
+    else if length cs == 1
+           then do
+             putStrLn $ "Category \"" ++ (fst $ head cs) ++ "\" only has a single option, so no weighting decision to make!"
+             return $ WYTree [(fst $ head cs, parentWeight, WYTree [])]
+           else do
+             putStrLn $ "Not equal weighting \"" ++ L.intercalate " : " (map fst cs) ++ "\"!"
+             weights <- promptForWeights (map fst cs)
+             let treeStrings = map (map fst . treeToList . snd) cs
+             equalNested <- isEqualWeightNested treeStrings
+             let totalWeight = sum weights
+             let normalized = map (\x -> (x / totalWeight) * parentWeight) weights
+             subtrees <- mapM (\((name, yamlTree), weight) -> do
+               wyTree <- normalizeWeights weight yamlTree
+               return (name, weight, wyTree)) (zip cs normalized)
+             return (WYTree subtrees)
 
 --q13:Now, please write a pretty printer for WeightedYamlTrees that produces
 --"instruments_hierarchy_weighted.yaml" for the YamlTree corresponding to
 --"instruments_hierarchy_regular.yaml", for example. (Again, no hard-coding!)
 ----e.g.##            us-long-bonds: 0.022/instruments - 0.11/bonds - 0.33/long-bonds
 
--- TODO:
--- print first line
+
 wyTreePrint' :: WYTree -> String
 wyTreePrint' (WYTree x) = "instrument_weights:\n" ++ concatMap (\y -> wyTreePrint y [("instruments", 1.0)]) x
--- --find the function to pretty print the float!!!
 
--- TODO:
--- remove pending '-'
--- The desired output is inconsistent, compare line 11 with 15 for example.
 wyTreePrint :: (String, Float, WYTree) -> [(String, Float)] -> String
 wyTreePrint (name, weight, (WYTree ts)) parents = let
   depth = length parents
@@ -516,9 +444,12 @@ formatFloat :: Float -> String
 formatFloat f = printf "%.2f" f
 
 replicatePortions :: [(String, Float)] -> Float -> String
-replicatePortions [] _ = ""
-replicatePortions ((parent, parentWeight):rest) weight =
-  " - " ++ formatFloat (weight/parentWeight) ++ "/" ++ parent ++ replicatePortions rest weight
+replicatePortions ps w = L.intercalate " - " (portions ps w)
+
+portions :: [(String, Float)] -> Float -> [String]
+portions [] _ = []
+portions ((parent, parentWeight):rest) weight = (formatFloat (weight/parentWeight) ++ "/" ++ parent) : portions rest weight
+
 --q.14
 -- Finally, put all the pieces together into an interactive program that
 -- - reads in a yaml file at a user-specified path (e.g. "/home/henkie/generated_configs/instrument_hierarchy.yaml")
@@ -528,16 +459,18 @@ replicatePortions ((parent, parentWeight):rest) weight =
 --------------------------------------------------------------------------------
 main :: IO ()
 main = do
--- - reads in a yaml file at a user-specified path (e.g. "/home/henkie/generated_configs/instrument_hierarchy.yaml")
--- - parses the yaml (like our "instruments-hierarchy.yaml") into a YamlTree
-    putStrLn "Enter the path to the YAML file:"
+--reads in a yaml file at a user-specified path (e.g. "/home/henkie/generated_configs/instrument_hierarchy.yaml")
+--parses the yaml (like our "instruments-hierarchy.yaml") into a YamlTree
+    putStrLn $ "Please input a source file location for the .yaml you want to parse! " 
+    putStr "> "
+    hFlush stdout
     path <- getLine
     yamlValueInput <- parse path
     let yamlTree' = convertToYAMLTree yamlValueInput
     let yamlTree = postProcessYamlTree yamlTree'
 -- - regularizer into a regular YamlTree, producing a YamlTree that would pretty print to "instruments-hierarchy-regular.yaml" for our particular example
-    putStrLn "Now get ready!!! I want to regularize the tree"
-    let regularized = regularize yamlTree'
+    putStrLn " "
+    let regularized = regularize yamlTree
     yamlTreeToYamlFile "instruments-regular.yaml" regularized
     putStrLn " "
 
@@ -547,168 +480,36 @@ main = do
     let leafCountsList = leafCounts' (treeToList yamlTree) []
     checkOverlappingLabels $ Map.toList leafCountsList
 --and (interactively) converts the regular YamlTree into a WeightedYamlTree, in such a way that our example would generate the interaction in "instruments-interaction.log"
-    putStrLn " Time to convert regular YamlTree into a WeightedYamlTree in such a way that our example would generate the interaction in instruments-interaction.log "
+    putStrLn " "
     wyTree <- userWeightRequest regularized
     print wyTree
-    --print (yamlTree)
-    -- --let yamlTree = YamlTree [("a", YamlTree [("b", YamlTree [("c", YamlTree []), ("d", YamlTree [])]), ("e", YamlTree [])]), ("f", YamlTree [])]
-    -- -- print (treeToList yamlTree)
-    --------q7 test
-    -- let leafCountsList = leafCounts' (treeToList yamlTree) []
-    -- print leafCountsList
-    -- checkOverlappingLabels $ Map.toList leafCountsList
---------q8
-    -- print(longestPath yamlTree)
-    -- print (find' "us-long-bonds" yamlTree)
-    -- output <- traverseTree yamlTree
-    -- print output
-    -- print ("leafDict" ++ " :" ++ " ")
-    -- print (leafDict (treeToList yamlTree) [])
-    --"leafDict= [("US10 US20 US30",1,["bonds","long-bonds","us-long-bonds","US10 US20 US30"]),("KR10",1,["bonds","long-bonds","KR10"]),("OAT BTP",1,["bonds","long-bonds","eu-short-bonds","OAT BTP"]),("US2 US3 US5",1,["bonds","short-bonds","us-short-bonds","US2 US3 US5"]),("SHATZ BTP3",1,["bonds","short-bonds","eu-short-bonds","SHATZ BTP3"]),("KR3",1,["bonds","short-bonds","KR3"]),("EURIBOR FED",1,["bonds","STIRs","EURIBOR FED"]),("CRUDE_W_mini BRENT-LAST HEATOIL GASOILINE",1,["energies","oil","CRUDE_W_mini BRENT-LAST HEATOIL GASOILINE"]),("GAS_US_mini GAS-LAST",1,["energies","gas","GAS_US_mini GAS-LAST"]),("INR-SGX",1,["currencies","usd-fx","INR-SGX"]),("EUR",1,["currencies","usd-fx","EUR"]),("GBP",1,["currencies","usd-fx","GBP"]),("EUR",1,["currencies","eur-fx","EUR"]),("EURGBP",1,["currencies","eur-fx","EURGBP"]),("SP500_mini R1000",1,["equities","us-equities","SP500_mini R1000"]),("AEX DAX",1,["equities","eu-equities","AEX DAX"]),("KOSPI",1,["equities","asia-equities","KOSPI"]),("VIX V2X VNKI",1,["vol","VIX V2X VNKI"])]
-    -- let yamlTree = YamlTree [("a", YamlTree [("b", YamlTree [("c", YamlTree []), ("d", YamlTree [])]), ("e", YamlTree [])]), ("f", YamlTree [])]
-    -- let overlappingLeaves = findOverlappingLeaves yamlTree
-    -- mapM_ printWarning overlappingLeaves
-    -- input  <- Y.decodeFileThrow "instruments-hierarchy.yaml"
-    -- output <- Y.decodeFileThrow "instruments-hierarchy-regular.yaml"
-    -- let regularized = regularize input
-    -- putStrLn (show $ regularized == output)
-    -- yamlValue <- parse "instruments-hierarchy.yaml"
-    -- print yamlValue
-    -- let yamlTree = convertToYAMLTree yamlValue
-    -- print yamlTree
-    -- let regularized = regularize yamlTree
-    -- -- yamlValue2 <- parse "instruments-hierarchy-regular.yaml"
-    -- -- let yamlTree2 = convertToYAMLTree yamlValue2
-    -- -- -- --print (prop_isRegular yamlTree) --works fine
-    -- -- putStrLn (show $ regularized == yamlTree2)
-    -- print regularized
-    -- -- print (depthi yamlTree)
-    -- -- print (isRegular yamlTree2)
-    -- yamlTreeToYamlFile "output1.yaml" regularized
-    -- print (isRegular regularized)
-    ----------------------testing partition---------not working []---
-    -- let testInput = [("bonds",YamlTree [("long-bonds",YamlTree [("us-long-bonds",YamlTree [("US10 US20 US30",YamlTree [])]),("KR10",YamlTree [("KR10",YamlTree [])]),("eu-short-bonds",YamlTree [("OAT BTP",YamlTree [])])]),("short-bonds",YamlTree [("us-short-bonds",YamlTree [("US2 US3 US5",YamlTree [])]),("eu-short-bonds",YamlTree [("SHATZ BTP3",YamlTree [])]),("KR3",YamlTree [("KR3",YamlTree [])])]),("STIRs",YamlTree [("STIRs",YamlTree [("EURIBOR FED",YamlTree [])])])]),("energies",YamlTree [("energies",YamlTree [("oil",YamlTree [("CRUDE_W_mini BRENT-LAST HEATOIL GASOILINE",YamlTree [])]),("gas",YamlTree [("GAS_US_mini GAS-LAST",YamlTree [])])])]),("currencies",YamlTree [("currencies",YamlTree [("usd-fx",YamlTree [("INR-SGX EUR GBP",YamlTree [])]),("eur-fx",YamlTree [("EUR EURGBP",YamlTree [])])])]),("equities",YamlTree [("equities",YamlTree [("us-equities",YamlTree [("SP500_mini R1000",YamlTree [])]),("eu-equities",YamlTree [("AEX DAX",YamlTree [])]),("asia-equities",YamlTree [("KOSPI",YamlTree [])])])]),("vol",YamlTree [("vol",YamlTree [("vol",YamlTree [("VIX V2X VNKI",YamlTree [])])])])]
-    -- let subtrees = concatMap (\(_, tree) -> treeToList tree) testInput
-    -- let okTrees = L.filter (\(_, tree) -> depthi tree == 4) subtrees
-    -- print okTrees
---------------------------------
-    -- yamlTreeToYamlFile "output.yaml" yamlTree
-    -- yamlTreeToYamlFile "output1.yaml" (YamlTree $ regularizedTree)
-    -- print regularizedTree
+--- pretty prints the resulting WeightedYamlTree to a file (e.g. "/home/henkie/generated_configs/instrument_hierarchy_weighted.yaml")
+    let st = wyTreePrint' wyTree
+    writeFile "instrument_hierarchy_weighted.yaml" st
 
 
-
-    -- putStrLn "Error: regularize test failed"
-    -- putStrLn "Input:"
-    -- let testInput = YamlTree [("", YamlTree [])] --this passed even with "aa"
-    -- let testInput = YamlTree [("bonds",YamlTree [("long-bonds",YamlTree [("us-long-bonds",YamlTree [("US10 US20 US30",YamlTree [])]),("KR10",YamlTree [("KR10",YamlTree [])]),("eu-short-bonds",YamlTree [("OAT BTP",YamlTree [])])]),("short-bonds",YamlTree [("us-short-bonds",YamlTree [("US2 US3 US5",YamlTree [])]),("eu-short-bonds",YamlTree [("SHATZ BTP3",YamlTree [])]),("KR3",YamlTree [("KR3",YamlTree [])])]),("STIRs",YamlTree [("STIRs",YamlTree [("EURIBOR FED",YamlTree [])])])]),("energies",YamlTree [("energies",YamlTree [("oil",YamlTree [("CRUDE_W_mini BRENT-LAST HEATOIL GASOILINE",YamlTree [])]),("gas",YamlTree [("GAS_US_mini GAS-LAST",YamlTree [])])])]),("currencies",YamlTree [("currencies",YamlTree [("usd-fx",YamlTree [("INR-SGX EUR GBP",YamlTree [])]),("eur-fx",YamlTree [("EUR EURGBP",YamlTree [])])])]),("equities",YamlTree [("equities",YamlTree [("us-equities",YamlTree [("SP500_mini R1000",YamlTree [])]),("eu-equities",YamlTree [("AEX DAX",YamlTree [])]),("asia-equities",YamlTree [("KOSPI",YamlTree [])])])]),("vol",YamlTree [("vol",YamlTree [("vol",YamlTree [("VIX V2X VNKI",YamlTree [])])])])]
-    -- let regularized = regularize testInput
-    -- print (regularized == YamlTree [("", YamlTree [])])
-    -- putStrLn "Expected output:"
-    -- print output
-    -- putStrLn "Actual output:"
-    -- print regularized
-    --Q.verboseCheck (prop_isRegular)
-    -- let prop_empty_tree = Q.property $ MO.when (nullYamlTree yamltree) Q.discard
-    --     prop_nonempty_tree = Q.property prop_my_io_action
-    -- Q.quickCheck prop_empty_tree
-    -- Q.quickCheck prop_nonempty_tree
-    --let testInput = YamlTree [("bonds",YamlTree [("long-bonds",YamlTree [("us-long-bonds",YamlTree [("US10 US20 US30",YamlTree [])]),("KR10",YamlTree [("KR10",YamlTree [])]),("eu-short-bonds",YamlTree [("OAT BTP",YamlTree [])])]),("short-bonds",YamlTree [("us-short-bonds",YamlTree [("US2 US3 US5",YamlTree [])]),("eu-short-bonds",YamlTree [("SHATZ BTP3",YamlTree [])]),("KR3",YamlTree [("KR3",YamlTree [])])]),("STIRs",YamlTree [("STIRs",YamlTree [("EURIBOR FED",YamlTree [])])])]),("energies",YamlTree [("energies",YamlTree [("oil",YamlTree [("CRUDE_W_mini BRENT-LAST HEATOIL GASOILINE",YamlTree [])]),("gas",YamlTree [("GAS_US_mini GAS-LAST",YamlTree [])])])]),("currencies",YamlTree [("currencies",YamlTree [("usd-fx",YamlTree [("INR-SGX EUR GBP",YamlTree [])]),("eur-fx",YamlTree [("EUR EURGBP",YamlTree [])])])]),("equities",YamlTree [("equities",YamlTree [("us-equities",YamlTree [("SP500_mini R1000",YamlTree [])]),("eu-equities",YamlTree [("AEX DAX",YamlTree [])]),("asia-equities",YamlTree [("KOSPI",YamlTree [])])])]),("vol",YamlTree [("vol",YamlTree [("vol",YamlTree [("VIX V2X VNKI",YamlTree [])])])])]
-    --print (depth testInput)
-    --let testInput = YamlTree []
-    -- let testInput = YamlTree [("ExampleKey2",YamlTree [("ExampleKey2",YamlTree []),("ExampleKey2",YamlTree [])])] --this still needs to be handled!!!!!
-    -- result <- Q.quickCheck (prop_my_io_action testInput)
-    -- print result
-    -- Q.verboseCheck (prop_my_io_action testInput)
+   --Q.quickCheck (prop_my_io_action) --cabal run yamltree= if u want to run the application  / cabal run test= if u want to run the test
+  --print "hi"
+      -------------nr.2 choice with reasonable maxKeyLength and levels---------
+-- instance Q.Arbitrary YamlTree where
+--     arbitrary = Q.sized (arbitraryYamlTree 5)
     
-     --print $ yamlTreeToString (YamlTree [("gg", YamlTree [])])
-    -- print $ convertToYAMLTree (":\n")
-    -- yamlTreeToYamlFile "output2.yaml" $ YamlTree [("ExampleKey2",YamlTree [("ExampleKey2",YamlTree []),("ExampleKey2",YamlTree [])])]
-    -- yamlValue <- parse "output2.yaml"
-    -- print yamlValue
-    --print $ convertToYAMLTree yamlValue
-    --print (T.pack ":")
-    --Q.verboseCheck (prop_my_io_action)
-    -- Q.quickCheck (prop_my_io_action)
-    -- yamlValue <- parse "test.yaml"
-    --let yamlTree = convertToYAMLTree yamlValue
-    --Q.quickCheck $ prop_parser_prettyprinter
-    --Q.quickCheck (prop_parser_prettyprinter)
-    -- print $ prop_my_io_action (YamlTree [("abvc", YamlTree[("ttttt", YamlTree[])])])
-    -----------test partition which is not working!!
-    -- let test = testi 3 [("long-bond",YamlTree [("long-bonds",YamlTree [("us-long-bonds",YamlTree [("US S10 US20 US30",YamlTree [])]),("KR10",YamlTree [("",YamlTree [])]),("eu-short-bonds",YamlTree [("OAT BTP",YamlTree [])])])]),("short-bond",YamlTree [("short-bonds",YamlTree [("uus-short-bonds",YamlTree [("US2 US3 US5",YamlTree [])]),("eu-short-bonds",YamlTree [("SHA ATZ BTP3",YamlTree [])]),("KR3",YamlTree [("",YamlTree [])])])]),("VIX V2X VNK",YamlTree [("VNKI",YamlTree [])])]
-    -- let (trimmedTrees, added) = L.partition (\(_, tree) -> depthi tree == 1) test -- this produces []
-    -- print trimmedTrees
-    -- print test --[("long-bonds", ("us-long-bonds",YamlTree [("US S10 US20 US30",YamlTree [])]))]))--[("long-bond",YamlTree [("long-bonds",YamlTree [("us-long-bonds",YamlTree [("US S10 US20 US30",YamlTree [])]),("KR10",YamlTree [("",YamlTree [])]),("eu-short-bonds",YamlTree [("OAT BTP",YamlTree [])])])]),("short-bond",YamlTree [("short-bonds",YamlTree [("uus-short-bonds",YamlTree [("US2 US3 US5",YamlTree [])]),("eu-short-bonds",YamlTree [("SHA ATZ BTP3",YamlTree [])]),("KR3",YamlTree [("",YamlTree [])])])]),("VIX V2X VNK",YamlTree [("VNKI",YamlTree [])])])
-    -- print (isRegular (YamlTree $ test))
-    -- print yamlValue
-    -- let yamlTree = convertToYAMLTree yamlValue
-    -- print yamlTree
-    -- yamlTreeToYamlFile "output.yaml" yamlTree
-    -- print $ yamlTreeToString (YamlTree [("", YamlTree[])])
-    -- print $ yamlTreeToString $ YamlTree[]
-    --print $ yamlTreeToString (YamlTree [("abvc", YamlTree[("ttttt", YamlTree[])])])
-    -- print $ parseYaml ("abvc:\n  ttttt\n")
-    --print $ parseYaml ""
-    --print (BS.pack ("abvc:\n  ttttt\n"))
-    --print $ Right $ Y.decodeEither' (BS.pack ("abvc:\n  ttttt\n"))
-    --print $ prop_parser_prettyprinter $ YamlTree [("abvc", YamlTree[("ttttt", YamlTree[])])]
-    --print $ prop_parser_prettyprinter (YamlTree [("bonds",YamlTree [("long-bonds",YamlTree [("us-long-bonds",YamlTree [("US10 US20 US30",YamlTree [])]),("KR10",YamlTree [("KR10",YamlTree [])]),("eu-short-bonds",YamlTree [("OAT BTP",YamlTree [])])]),("short-bonds",YamlTree [("us-short-bonds",YamlTree [("US2 US3 US5",YamlTree [])]),("eu-short-bonds",YamlTree [("SHATZ BTP3",YamlTree [])]),("KR3",YamlTree [("KR3",YamlTree [])])]),("STIRs",YamlTree [("STIRs",YamlTree [("EURIBOR FED",YamlTree [])])])]),("energies",YamlTree [("energies",YamlTree [("oil",YamlTree [("CRUDE_W_mini BRENT-LAST HEATOIL GASOILINE",YamlTree [])]),("gas",YamlTree [("GAS_US_mini GAS-LAST",YamlTree [])])])]),("currencies",YamlTree [("currencies",YamlTree [("usd-fx",YamlTree [("INR-SGX EUR GBP",YamlTree [])]),("eur-fx",YamlTree [("EUR EURGBP",YamlTree [])])])]),("equities",YamlTree [("equities",YamlTree [("us-equities",YamlTree [("SP500_mini R1000",YamlTree [])]),("eu-equities",YamlTree [("AEX DAX",YamlTree [])]),("asia-equities",YamlTree [("KOSPI",YamlTree [])])])]),("vol",YamlTree [("vol",YamlTree [("vol",YamlTree [("VIX V2X VNKI",YamlTree [])])])])])
-    --print $ prop_parser_prettyprinter (YamlTree [("", YamlTree [])])
-    --bool <- prop_parser_prettyprinter (YamlTree [("bonds",YamlTree [("long-bonds",YamlTree [("us-long-bonds",YamlTree [("US10 US20 US30",YamlTree [])]),("KR10",YamlTree [("KR10",YamlTree [])]),("eu-short-bonds",YamlTree [("OAT BTP",YamlTree [])])]),("short-bonds",YamlTree [("us-short-bonds",YamlTree [("US2 US3 US5",YamlTree [])]),("eu-short-bonds",YamlTree [("SHATZ BTP3",YamlTree [])]),("KR3",YamlTree [("KR3",YamlTree [])])]),("STIRs",YamlTree [("STIRs",YamlTree [("EURIBOR FED",YamlTree [])])])]),("energies",YamlTree [("energies",YamlTree [("oil",YamlTree [("CRUDE_W_mini BRENT-LAST HEATOIL GASOILINE",YamlTree [])]),("gas",YamlTree [("GAS_US_mini GAS-LAST",YamlTree [])])])]),("currencies",YamlTree [("currencies",YamlTree [("usd-fx",YamlTree [("INR-SGX EUR GBP",YamlTree [])]),("eur-fx",YamlTree [("EUR EURGBP",YamlTree [])])])]),("equities",YamlTree [("equities",YamlTree [("us-equities",YamlTree [("SP500_mini R1000",YamlTree [])]),("eu-equities",YamlTree [("AEX DAX",YamlTree [])]),("asia-equities",YamlTree [("KOSPI",YamlTree [])])])]),("vol",YamlTree [("vol",YamlTree [("vol",YamlTree [("VIX V2X VNKI",YamlTree [])])])])])
-    --print bool
-    -- print yamlTree)
-    -- --let tree = YamlTree [("bonds",YamlTree [("long-bonds",YamlTree [("us-long-bonds",YamlTree [("US10 US20 US30",YamlTree [])]),("KR10",YamlTree [("KR10",YamlTree [])]),("eu-short-bonds",YamlTree [("OAT BTP",YamlTree [])])]),("short-bonds",YamlTree [("us-short-bonds",YamlTree [("US2 US3 US5",YamlTree [])]),("eu-short-bonds",YamlTree [("SHATZ BTP3",YamlTree [])]),("KR3",YamlTree [("KR3",YamlTree [])])]),("STIRs",YamlTree [("STIRs",YamlTree [("EURIBOR FED",YamlTree [])])])]),("energies",YamlTree [("energies",YamlTree [("oil",YamlTree [("CRUDE_W_mini BRENT-LAST HEATOIL GASOILINE",YamlTree [])]),("gas",YamlTree [("GAS_US_mini GAS-LAST",YamlTree [])])])]),("currencies",YamlTree [("currencies",YamlTree [("usd-fx",YamlTree [("INR-SGX EUR GBP",YamlTree [])]),("eur-fx",YamlTree [("EUR EURGBP",YamlTree [])])])]),("equities",YamlTree [("equities",YamlTree [("us-equities",YamlTree [("SP500_mini R1000",YamlTree [])]),("eu-equities",YamlTree [("AEX DAX",YamlTree [])]),("asia-equities",YamlTree [("KOSPI",YamlTree [])])])]),("vol",YamlTree [("vol",YamlTree [("vol",YamlTree [("VIX V2X VNKI",YamlTree [])])])])]
-    -- --print (yamlTreeToStringIndented tree)
-    -- yamlTreeToYamlFile "output.yaml" yamlTree
-    -- --writeFile "output.yaml" (yamlTreeToTextIndented tree)
----------test postProcessing
-    
-  --let input = YamlTree [("bonds",YamlTree [("long-bonds",YamlTree [("us-long-bonds",YamlTree [("US10 US20 US30",YamlTree [])]),("KR10",YamlTree [("KR10",YamlTree [])]),("eu-short-bonds",YamlTree [("OAT BTP",YamlTree [])])]),("short-bonds",YamlTree [("us-short-bonds",YamlTree [("US2 US3 US5",YamlTree [])]),("eu-short-bonds",YamlTree [("SHATZ BTP3",YamlTree [])]),("KR3",YamlTree [("KR3",YamlTree [])])]),("STIRs",YamlTree [("STIRs",YamlTree [("EURIBOR FED",YamlTree [])])])]),("energies",YamlTree [("energies",YamlTree [("oil",YamlTree [("CRUDE_W_mini BRENT-LAST HEATOIL GASOILINE",YamlTree [])]),("gas",YamlTree [("GAS_US_mini GAS-LAST",YamlTree [])])])]),("currencies",YamlTree [("currencies",YamlTree [("usd-fx",YamlTree [("INR-SGX EUR GBP",YamlTree [])]),("eur-fx",YamlTree [("EUR EURGBP",YamlTree [])])])]),("equities",YamlTree [("equities",YamlTree [("us-equities",YamlTree [("SP500_mini R1000",YamlTree [])]),("eu-equities",YamlTree [("AEX DAX",YamlTree [])]),("asia-equities",YamlTree [("KOSPI",YamlTree [])])])]),("vol",YamlTree [("vol",YamlTree [("vol",YamlTree [("VIX V2X VNKI",YamlTree [])])])])]
-  --let  input = YamlTree [("bonds",YamlTree [("long-bonds",YamlTree [("us-long-bonds",YamlTree [("US10 US20 US30",YamlTree [])]),("KR10",YamlTree [("KR10",YamlTree [])])])])]
-  -- print (postProcessYamlTree input) --output: YamlTree [("bonds",YamlTree [("long-bonds",YamlTree [("us-long-bonds",YamlTree [("US10",YamlTree []),("US20",YamlTree []),("US30",YamlTree [])]),("KR10",YamlTree [("KR10",YamlTree [])]),("eu-short-bonds",YamlTree [("OAT",YamlTree []),("BTP",YamlTree [])])]),("short-bonds",YamlTree [("us-short-bonds",YamlTree [("US2",YamlTree []),("US3",YamlTree []),("US5",YamlTree [])]),("eu-short-bonds",YamlTree [("SHATZ",YamlTree []),("BTP3",YamlTree [])]),("KR3",YamlTree [("KR3",YamlTree [])])]),("STIRs",YamlTree [("STIRs",YamlTree [("EURIBOR",YamlTree []),("FED",YamlTree [])])])]),("energies",YamlTree [("energies",YamlTree [("oil",YamlTree [("CRUDE_W_mini",YamlTree []),("BRENT-LAST",YamlTree []),("HEATOIL",YamlTree []),("GASOILINE",YamlTree [])]),("gas",YamlTree [("GAS_US_mini",YamlTree []),("GAS-LAST",YamlTree [])])])]),("currencies",YamlTree [("currencies",YamlTree [("usd-fx",YamlTree [("INR-SGX",YamlTree []),("EUR",YamlTree []),("GBP",YamlTree [])]),("eur-fx",YamlTree [("EUR",YamlTree []),("EURGBP",YamlTree [])])])]),("equities",YamlTree [("equities",YamlTree [("us-equities",YamlTree [("SP500_mini",YamlTree []),("R1000",YamlTree [])]),("eu-equities",YamlTree [("AEX",YamlTree []),("DAX",YamlTree [])]),("asia-equities",YamlTree [("KOSPI",YamlTree [])])])]),("vol",YamlTree [("vol",YamlTree [("vol",YamlTree [("VIX",YamlTree []),("V2X",YamlTree []),("VNKI",YamlTree [])])])])]
-------------------------
-  --arbitrary so that it never generates "" string.
---I need to handle empty yaml file . can not be parsed ?
---make a simplist yamlTree with text
---pretty prineter should
---try to replace the element of the tree to that generator
---arbitrary should parse your specific tree
---then make it general . using generator funciton like listOf
-
---I need to create an instance of the Arbitrary typeclass for your YamlTree type in order to use it with QuickCheck's quickCheck function. This instance tells QuickCheck how to generate random YamlTree values for testing.
--- instance Arbitrary MyType where
---   arbitrary = do
---     x <- arbitraryChar
---     y <- arbitraryChar
---     return (MyType x y)
-    -- To generate a random value of type a, we need a generator for values of that type: Gen a. The default generator for values of any type is arbitrary, which is a method of QuickCheck's Arbitrary type class
-    -- Q.quickCheckWith Q.stdArgs { Q.maxSuccess = 100 } prop_parser_prettyprinter
-    -- y1 <- Q.generate arbitrary :: IO YamlTree
-    -- y2 <- Q.generate arbitrary :: IO YamlTree
-    -- putStrLn $ show y1
-    -- putStrLn $ show y2
---SOALLLLLLA:problems: sanaz -> sanaz: in yaml file , seeing the result of prop not possible, asking about the YamlTree definition, YamlTree[YamlTree]??line 19 hierarchy.yaml        KR3:
---SOALLLLA: decodeFileThrow why doesn't respond-yaml file weird. not ideal structure. leaf missing, to regularize it is very inherent of . not how yaml works, how yaml lib works with spaces I needed to postprocess a bit
--- testi :: Int -> [(String, YamlTree)] -> [(String, YamlTree)]
--- testi depth trees
---   | depth == 0 = trees
---   | otherwise =
---     let subtrees = concatMap (\(_, tree) -> treeToList tree) trees
-
---------
--- a = WeightedYamlTree 1.0 [("bonds",WeightedYamlTree 0.5 [("long-bonds",
---                                                           WeightedYamlTree 0.5 [("us-long-bonds",
---                                                                                  WeightedYamlTree 0.25 [("US10",WeightedYamlTree 0.0833 []),
---                                                                                                         ("US20",WeightedYamlTree 0.0833 []),
---                                                                                                         ("US30",WeightedYamlTree 0.0833 [])]),
---                                                                                 ("eu-long-bonds",WeightedYamlTree 0.25 [])])]),
---                             ("energies",
---                             WeightedYamlTree 0.5 [("oil",
---                                                     WeightedYamlTree 0.16 [("CRUDE_W_mini",WeightedYamlTree 0.16 [])]),
---                                                   ("gas",
---                                                     WeightedYamlTree 0.16 [("GAS_US_mini",WeightedYamlTree 0.08 []),
---                                                                           ("GAS-LAST",WeightedYamlTree 0.08 [])]),
---                                                   ("KR3",WeightedYamlTree 0.16 [])]
---                             )]
---Sanaz TODO: q14 , finish proof, talking to Mathijs observed, rounding float, 
+-- arbitraryYamlTree :: Int -> Int -> Gen YamlTree
+-- arbitraryYamlTree 0 _ = return $ YamlTree []
+-- arbitraryYamlTree n maxKeyLength = do
+--     numKeys <- Q.choose (1, 3)
+--     keysAndVals <- replicateM numKeys arbitraryKeyAndVal
+--     return $ YamlTree (mergeTuples keysAndVals)
+--     where
+--         arbitraryKeyAndVal = do
+--             key <- arbitraryKey 8
+--             val <- if n == 1
+--                        then return $ YamlTree []
+--                        else arbitraryYamlTree (n-1) maxKeyLength
+--             return (key, val)
+-- arbitraryKey :: Int -> Gen String
+-- arbitraryKey maxKeyLength = do
+--     let validChars = ['A','B','c','d', 'F', 'G']
+--     keyLength <- Q.choose (1, 8)
+--     key <- replicateM keyLength (Q.elements validChars)
+--     return $ if null key then "default_key" else key  

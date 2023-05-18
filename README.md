@@ -1,5 +1,4 @@
 # yamlFileReader
-1. Write a function longestPath :: YamlTree -> [String] that finds the longest path in a YamlTree. Using equational reasoning, write down a formal proof that length . longestPath = depth . Please specify all definitions you use in the proof and give them a label. Please clearly state any induction hypotheses you use. Please justify each proof step with the label of the definition or with I.H. for an induction hypothesis.
 
 Lemma (a): The YamlTree type can be defined as YamlTree [(String, YamlTree)].
 
