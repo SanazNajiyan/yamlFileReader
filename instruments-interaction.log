@@ -1,0 +1,112 @@
+Please input a source file location for the .yaml you want to parse!
+> /home/henkie/generated_configs/instrument_hierarchy.yaml
+
+WARNING: instrument "EUR" occurs in multiple places in hierarchy:
+"currencies - currencies - usd-fx - EUR"
+"currencies - currencies - eur-fx - EUR"
+
+Equal weight "bonds : energies : currencies : equities : vol"? (Type "no" or "NO" or "n" or "N" to give custom weights. Any other input will result in equal weights.)
+> y
+Equal weighting "bonds : energies : currencies : equities : vol"!
+
+Equal weight "long-bonds : short-bonds : STIRs"? (Type "no" or "NO" or "n" or "N" to give custom weights. Any other input will result in equal weights.)
+> awawg
+Equal weighting "long-bonds : short-bonds : STIRs"!
+
+Equal weight "us-long-bonds : KR10 : eu-long-bonds"? (Type "no" or "NO" or "n" or "N" to give custom weights. Any other input will result in equal weights.)
+> yesyes
+Equal weighting "us-long-bonds : KR10 : eu-long-bonds"!
+
+Equal weight "US10 : US20 : US30"? (Type "no" or "NO" or "n" or "N" to give custom weights. Any other input will result in equal weights.)
+> YESS
+Equal weighting "US10 : US20 : US30"!
+
+Category "KR10" only has a single option, so no weighting decision to make!
+
+Equal weight "OAT : BTP" (Type "no" or "NO" or "n" or "N" to give custom weights. Any other input will result in equal weights.)
+> yay
+Equal weighting "OAT : BTP"!
+
+Equal weight "us-short-bonds : eu-short-bonds : KR3"? (Type "no" or "NO" or "n" or "N" to give custom weights. Any other input will result in equal weights.)
+> n 
+Not equal weighting "us-short-bonds : eu-short-bonds : KR3"!
+Please specify relative weight of "us-short-bonds"!
+> 8
+Please specify relative weight of "eu-short-bonds"!
+> 8 
+Please specify relative weight of "KR3"!
+> 4
+Your chosen weights sum to "20". Normalizing to "1" gives relative weights of "0.4 : 0.4 : 0.2" for "us-short-bonds : eu-short-bonds : KR3"!
+
+Equal weight "US2 : US3 : US5"? (Type "no" or "NO" or "n" or "N" to give custom weights. Any other input will result in equal weights.)
+> ok 
+Equal weighting "US2 : US3 : US5"!
+
+Equal weight "SHATZ : BTP3"? (Type "no" or "NO" or "n" or "N" to give custom weights. Any other input will result in equal weights.)
+> YIPPIE
+Equal weighting "SHATZ : BTP3"!
+
+Category "STIRs" only has a single option, so no weighting decision to make!
+
+Equal weight "EURIBOR : FED"? (Type "no" or "NO" or "n" or "N" to give custom weights. Any other input will result in equal weights.)
+> wnlgiejan`lihjwrawngjonjlNLNGAJL
+Equal weighting "EURIBOR : FED"!
+
+Category "energies" only has a single option, so no weighting decision to make!
+
+Equal weight "oil : gas"? (Type "no" or "NO" or "n" or "N" to give custom weights. Any other input will result in equal weights.)
+> no 
+Not equal weighting "oil : gas"!
+Please specify relative weight of "oil"!
+> 75
+Please specify relative weight of "gas"!
+> 25
+Your chosen weights sum to "100". Normalizing to "1" gives relative weights of "0.75 : 0.25" for "oil : gas"!
+
+Equal weight "CRUDE_W_mini : BRENT-LAST : HEATOIL : GASOILINE"? (Type "no" or "NO" or "n" or "N" to give custom weights. Any other input will result in equal weights.)
+> sure
+Equal weighting "CRUDE_W_mini : BRENT-LAST : HEATOIL : GASOILINE"!
+
+Equal weight "GAS_US_mini : GAS-LAST"? (Type "no" or "NO" or "n" or "N" to give custom weights. Any other input will result in equal weights.)
+> okk
+Equal weighting "GAS_US_mini : GAS-LAST"!
+
+Category "currencies" only has a single option, so no weighting decision to make!
+
+Equal weight "usd-fx : eur-fx"? (Type "no" or "NO" or "n" or "N" to give custom weights. Any other input will result in equal weights.)
+> yeah
+Equal weighting "usd-fx : eur-fx"!
+
+Equal weight "INR-SGX : EUR : GBP"? (Type "no" or "NO" or "n" or "N" to give custom weights. Any other input will result in equal weights.)
+> yes
+Equal weighting "INR-SGX : EUR : GBP"!
+
+Equal weight "EUR : EURGBP"? (Type "no" or "NO" or "n" or "N" to give custom weights. Any other input will result in equal weights.)
+> Y
+Equal weighting "EUR : EURGBP"!
+
+Category "equities" only has a single option, so no weighting decision to make!
+
+Equal weight "us-equities : eu-equities : asia-equities"? (Type "no" or "NO" or "n" or "N" to give custom weights. Any other input will result in equal weights.)
+> yup
+Equal weighting "us-equities : eu-equities : asia-equities"!
+
+Equal weight "SP500_mini : R1000"? (Type "no" or "NO" or "n" or "N" to give custom weights. Any other input will result in equal weights.)
+> y
+Equal weighting "SP500_mini : R1000"!
+
+Equal weight "AEX : DAX"? (Type "no" or "NO" or "n" or "N" to give custom weights. Any other input will result in equal weights.)
+> y
+Equal weighting "AEX : DAX"!
+
+Category "asia-equities" only has a single option, so no weighting decision to make!
+
+Category "vol" only has a single option, so no weighting decision to make!
+
+Category "vol" only has a single option, so no weighting decision to make!
+
+Equal weight "VIX : V2X : VNKI"? (Type "no" or "NO" or "n" or "N" to give custom weights. Any other input will result in equal weights.)
+> Y
+Equal weighting "VIX : V2X : VNKI"!
+
+Output was written to "/home/henkie/generated_configs/instrument_hierarchy_weighted.yaml".
