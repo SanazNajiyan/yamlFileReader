@@ -43,7 +43,6 @@ import qualified Data.Map as Map
 import Text.Read (readMaybe)
 import Debug.Trace (trace)
 import Data.List.Split (splitOn)
-import System.FilePath
 
 
 
@@ -470,7 +469,6 @@ main = do
     putStr "> "
     hFlush stdout
     path <- getLine
-    let normalizedPath = normalise path
     yamlValueInput <- parse path
     let yamlTree' = convertToYAMLTree yamlValueInput
     let yamlTree = postProcessYamlTree yamlTree'
@@ -499,11 +497,11 @@ main = do
     let outputFilePath = keepThisPath' ++ " instrument_hierarchy_weighted.yaml"
     let outputFilePathList = words outputFilePath
     let final = L.intercalate "\\" outputFilePathList
-    putStrLn $ "Output was written to \"" ++ final ++ "\"." --    -- Print the modified path
+    putStrLn $ "\n" ++ "Output was written to \"" ++ final ++ "\"." --    -- Print the modified path
     writeFile final st
-
-   --Q.quickCheck (prop_my_io_action) --cabal run yamltree= if u want to run the application  / cabal run test= if u want to run the test
-  --print "hi"
+    ---here I tested my quickCheck tests
+    -- Q.quickCheck prop_isRegular
+   --Q.quickCheck (prop_my_io_action) --cabal run yamltree= if u want to run the application  / cabal test= if u want to run the test
       -------------nr.2 choice with reasonable maxKeyLength and levels---------
 -- instance Q.Arbitrary YamlTree where
 --     arbitrary = Q.sized (arbitraryYamlTree 5)
@@ -528,4 +526,4 @@ main = do
 --     key <- replicateM keyLength (Q.elements validChars)
 --     return $ if null key then "default_key" else key  
 --C:\Users\sanaz\source\yamlFileReader\instrument_hierarchy_weighted.yaml
---"C:\Users\sanaz\instruments-hierarchy.yaml"
+--C:\Users\sanaz\instruments-hierarchy.yaml
