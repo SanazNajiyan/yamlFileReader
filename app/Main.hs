@@ -24,25 +24,25 @@ main = do
     putStr "> "
     hFlush stdout
     path <- getLine
-    yamlValueInput <- Lib.parse path
-    let yamlTree' = Lib.convertToYAMLTree yamlValueInput
-    let yamlTree = Lib.postProcessYamlTree yamlTree'
+    yamlValueInput <- parse path
+    let yamlTree' = convertToYAMLTree yamlValueInput
+    let yamlTree = postProcessYamlTree yamlTree'
 -- - regularizer into a regular YamlTree, producing a YamlTree that would pretty print to "instruments-hierarchy-regular.yaml" for our particular example
     putStrLn " "
-    let regularized = Lib.regularize yamlTree
-    Lib.yamlTreeToYamlFile "instruments-regular.yaml" regularized
+    let regularized = regularize yamlTree
+    yamlTreeToYamlFile "instruments-regular.yaml" regularized
     putStrLn " "
     --putStrLn $ "it is " ++ show (isRegular regularized) ++ " that the output YamlTree is regularize!!!" ++ " with the depth: " ++ show (depthi regularized)
     putStrLn " "
 -- - checks for overlapping leaf labels and prints warnings
-    let leafCountsList = Lib.leafCounts' (treeToList yamlTree) []
+    let leafCountsList = leafCounts' (treeToList yamlTree) []
     checkOverlappingLabels $ Map.toList leafCountsList
 --and (interactively) converts the regular YamlTree into a WeightedYamlTree, in such a way that our example would generate the interaction in "instruments-interaction.log"
     putStrLn " "
-    wyTree <- Lib.userWeightRequest regularized
+    wyTree <- userWeightRequest regularized
     --print wyTree
 --- pretty prints the resulting WeightedYamlTree to a file (e.g. "/home/henkie/generated_configs/instrument_hierarchy_weighted.yaml")
-    let st = Lib.wyTreePrint' wyTree
+    let st = wyTreePrint' wyTree
     writeFile "instrument_hierarchy_weighted.yaml" st
     let pathList = splitOn "\\" path
     -- Remove the last element from the list
