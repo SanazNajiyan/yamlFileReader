@@ -56,38 +56,48 @@ data YamlTree = YamlTree [(String, YamlTree)]
 parse :: FilePath -> IO Y.YamlValue
 parse path = do
   content <- BS.readFile path
+
+  -- Case 1: Empty file
   if BS.null content
     then return (Y.Mapping [] Nothing)
+
+  -- Case 2: File contains only a single colon
   else if (BS.strip content == BS.pack ":")
     then return (Y.Mapping [(T.empty, Y.Mapping [] Nothing)] Nothing)
-  --else if ((last (BS.strip content)) == BS.pack ":")
+
+  -- Case 3: File ends with a colon then Yaml mapping with single key-val created
   else if (BS.isSuffixOf (BS.pack ":") (BS.strip content))
-    then return $ Y.Mapping [( TE.decodeUtf8 $ BS.init (BS.strip content), Y.Mapping [] Nothing)] Nothing
+    then return $ Y.Mapping [(TE.decodeUtf8 $ BS.init (BS.strip content), Y.Mapping [] Nothing)] Nothing
+
+  -- Default case: Read the YAML file
   else Y.readYamlFile path
 
-
-
+--this is the base of parsing but I realized I should handle cases separatly
 -- parse :: FilePath -> IO Y.YamlValue
 -- parse = Y.readYamlFile
 
 convertToYAMLTree :: Y.YamlValue -> YamlTree
-convertToYAMLTree (Y.Mapping list _) = YamlTree (L.map (\(xs,ys) -> (T.unpack xs, convertToYAMLTree ys)) list)
-convertToYAMLTree (Y.Scalar xs _ _ _) = if BS.unpack xs == ""
-  then YamlTree []
-  else YamlTree [(BS.unpack xs, YamlTree [])] --when we reach a Leaf
-convertToYAMLTree (Y.Sequence list _) = error "Yaml lists are not supported" --YamlTree $ L.map (\x -> ("-", convertToYAMLTree x)) $ V.toList $ V.fromList list --In this implementation the list argument is first converted to a Vector using V.fromList, and then V.toList is used to convert the Vector to a list.
-convertToYAMLTree (Y.Alias _) = error "Aliasses are not supported"
+convertToYAMLTree (Y.Mapping list _) = -- If YamlValue is a mapping
+  YamlTree (L.map (\(xs,ys) -> (T.unpack xs, convertToYAMLTree ys)) list) -- Convert each key-value pair to a tuple of strings and recursively convert the value to a YamlTree
 
+convertToYAMLTree (Y.Scalar xs _ _ _) = -- If YamlValue is a scalar
+  if BS.unpack xs == "" -- Check if the scalar value is empty
+    then YamlTree [] -- If empty, create an empty YamlTree
+    else YamlTree [(BS.unpack xs, YamlTree [])] -- leaf node
+
+convertToYAMLTree (Y.Sequence list _) = -- If YamlValue is a sequence (list)
+  error "Yaml lists are not supported" -- Error: YAML lists are not supported in this implementation
+
+convertToYAMLTree (Y.Alias _) = -- If YamlValue is an alias
+  error "Aliases are not supported" -- Error: Aliases are not supported
+
+--the function writes the YAML string to the specified file  
 yamlTreeToYamlFile :: FilePath -> YamlTree -> IO ()
 yamlTreeToYamlFile filePath tree = do
-    let yamlText = yamlTreeToString tree
-    writeFile filePath yamlText
+  let yamlText = yamlTreeToString tree -- Convert the YamlTree to a YAML string representation
+  writeFile filePath yamlText -- Write the YAML string to the specified file path
 
-indent :: Int -> String -> String
-indent n line
-  | null line = ""
-  | otherwise = replicate n ' ' ++ line ++ "\n"
-
+--the function converts a YamlTree to a String representation with indentation
 yamlTreeToStringIndented :: Int -> YamlTree -> String
 yamlTreeToStringIndented _ (YamlTree []) = ""
 yamlTreeToStringIndented indentLevel (YamlTree ((key, value):rest)) =
@@ -98,7 +108,13 @@ yamlTreeToStringIndented indentLevel (YamlTree ((key, value):rest)) =
         indentedSubtreeText = if null valueText then "" else valueText
         valueText = if isStringWithSpaces key
                         then  L.intercalate "" $ map (indent $ (indentLevel + 1) * 2) (words key)
-                        else yamlTreeToStringIndented (indentLevel + 1) value
+                        else yamlTreeToStringIndented (indentLevel + 1) value --recursive handling of values
+
+indent :: Int -> String -> String
+indent n line
+  | null line = ""
+  | otherwise = replicate n ' ' ++ line ++ "\n"
+                        
 --postProcessYamlTree is defined because when finding the leafs the keys with spaces are problematic and wrongly not taken as a separate leaf
 --it splits the key into separate nodes with empty values, essentially creating a nested structure. If the key does not have spaces, it simply recursively applies the same function to its child nodes
 postProcessYamlTree :: YamlTree -> YamlTree
@@ -117,6 +133,7 @@ postProcessYamlTree (YamlTree ((k, yamlTree) : kyamls))
 
 isStringWithSpaces :: String -> Bool
 isStringWithSpaces s = ' ' `elem` s
+
 --pretty printer for YamlTrees that generates a .yaml-file again from your hierarchy
 yamlTreeToString :: YamlTree -> String
 yamlTreeToString (YamlTree []) = ""
@@ -125,6 +142,7 @@ yamlTreeToString (YamlTree ((key, value):rest)) =
     where
         subtreeText = indent 0 (key ++ ":") ++ indentedSubtreeText
         indentedSubtreeText = yamlTreeToStringIndented 1 value
+
 ---------q3-----
 --If we pretty print a YAML tree, we should be able to parse it and get the same tree back.
 --taking a generated YamlTree and check if it can be parsed back into the same tree
