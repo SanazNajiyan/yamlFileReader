@@ -1,11 +1,11 @@
 
 module Test where
 
-import Main
+import Lib
 import qualified Test.QuickCheck as Q
 
 
 main :: IO ()
 main = do
-    Q.quickCheck prop_my_io_action
-    --Q.quickCheck prop_isRegular
+    Q.quickCheck Lib.prop_my_io_action
+    --Q.quickCheck Lib.prop_isRegular
