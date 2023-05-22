@@ -21,6 +21,24 @@ maintainer:         45420543+SanazNajiyan@users.noreply.github.com
 -- category:
 extra-source-files: CHANGELOG.md
 
+
+library
+    exposed-modules:
+        Lib
+    hs-source-dirs:
+        src
+    build-depends:
+        base ^>=4.16.4.0,
+        containers,
+        yaml,
+        aeson,
+        bytestring, 
+        text,
+        QuickCheck,
+        libyaml,
+        split
+    default-language: Haskell2010
+
 executable yamltree
     main-is:          Main.hs
 
