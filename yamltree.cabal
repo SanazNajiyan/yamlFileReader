@@ -43,7 +43,7 @@ executable yamltree
 
 test-suite test
     type:       exitcode-stdio-1.0
-    main-is:    Test.hs
+    main-is:    testThis.hs
     build-depends:  base ^>=4.16.4.0,
                     containers,
                     yaml,
