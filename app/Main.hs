@@ -153,44 +153,38 @@ prop_my_io_action :: YamlTree -> Q.Property
 prop_my_io_action yamltree =
   Q.monadicIO $ do
     let fileName = "output2.yaml"
-    run $ yamlTreeToYamlFile fileName yamltree --you don't need to read and write to a file. yamltree.cabal and test.hs are updated/newly introduced
+    run $ yamlTreeToYamlFile fileName yamltree
     yamlValue <- run $ parse fileName
     let result = convertToYAMLTree yamlValue
     Q.assert (result == yamltree)
---rewrap extension- altq
---The instance FromJSON Y.YamlValue is defined simply as parseJSON = parseJSON,
---which means that it will use the default implementation of parseJSON provided
---by FromJSON. Since YamlValue is already an instance of FromJSON, this is
---sufficient to define the instance.
+--Since Y.YamlValue is already an instance of FromJSON, this default implementation is sufficient to define the instance
 instance FromJSON Y.YamlValue where
     parseJSON = parseJSON
 
 
--------------nr.1 version-----
---In this version, arbitraryYamlTree generates a YamlTree of depth up to 5 by recursively calling itself with n-1
+-------------nr.1 version Arbitrary instance for YamlTree-----
+--defines an Arbitrary instance for YamlTree using QuickCheck. The arbitraryYamlTree function generates an arbitrary YamlTree with a maximum depth of 8
 instance Q.Arbitrary YamlTree where
     arbitrary = arbitraryYamlTree 8
     
 arbitraryYamlTree :: Int -> Gen YamlTree
-arbitraryYamlTree 0 = return $ YamlTree []
+arbitraryYamlTree 0 = return $ YamlTree [] --depth 0 returns empty YamlTree
 arbitraryYamlTree n = do
     numKeys <- Q.choose (1, 3)
-    keysAndVals <- replicateM numKeys arbitraryKeyAndVal
+    keysAndVals <- replicateM numKeys arbitraryKeyAndVal --generates a list of random key-val pairs
     return $ YamlTree (mergeTuples keysAndVals)
     where
         arbitraryKeyAndVal = do
             key <- arbitraryKey
             val <- if n == 1
                        then return $ YamlTree []
-                       else arbitraryYamlTree (n-1)
+                       else arbitraryYamlTree (n-1) --recursively generate a YamlTree as the value
             return (key, val)
         arbitraryKey = do
             key <- Q.elements ["Spring", "Summer", "autumn","ExampleSeason", "WINTER", "love", "HAPPY", "go", "LUCKY"]
             --key <- Q.listOf $ Q.elements validChars
             return $ if null key then "default_key" else key
 
-
-            
 --Define a helper function to merge tuples with the same value of YamlTree []
 mergeTuples :: [(String, YamlTree)] -> [(String, YamlTree)]
 mergeTuples [] = []
@@ -203,11 +197,8 @@ depthi :: YamlTree -> Int
 depthi (YamlTree []) = 1 -- base case, an empty YamlTree has depth 1
 depthi (YamlTree kvs) = 1 + maximum (map (depthi . snd) kvs)
 
-minDepth :: YamlTree -> Int
-minDepth (YamlTree []) = 1
-minDepth (YamlTree kvs) = 1 + minimum (map (depthi . snd) kvs)
 ---------q5
--- | Check whether a given YamlTree is regular
+--Check whether a given YamlTree is regular
 isRegular :: YamlTree -> Bool
 isRegular (YamlTree []) = True
 isRegular (YamlTree kvs) =
@@ -215,30 +206,27 @@ isRegular (YamlTree kvs) =
       isRegularSubtree (_, subtree) = isRegular subtree && depthi subtree == maximum depths
   in all isRegularSubtree kvs
 
--- | QuickCheck property to test whether a given YamlTree is regular
+--QuickCheck property to test whether a given YamlTree is regular
 prop_isRegular :: YamlTree -> Bool
 prop_isRegular = isRegular . regularize
 -----------q6
 --Write a function that "regularizes" a YamlTree into a regular one by copying levels in the hierarchy. Please ensure that this function regularizes the YamlTree implemented by "instruments-hierarchy.yaml" to the one implemented by "instruments-hierarchy-regular.yaml". (Again, we want a generally applicable solution. No hard-coding of the example allowed.)
--- data YamlTree = YamlTree [(String, YamlTree)]
+--the idea is make all branches have the same depth even if it requires adding empty levels to shallower branches
 regularize :: YamlTree -> YamlTree
 regularize yamlTree@(YamlTree subTrees) =
   let maxDepth = depthi yamlTree
       newTrees = regularizeSubTrees maxDepth subTrees
   in YamlTree newTrees
-
+--This function recursively adjusts the depth of each sub-tree to match the desired maxDepth.
 regularizeSubTrees :: Int -> [(String, YamlTree)] -> [(String, YamlTree)]
 regularizeSubTrees 0 [] = []
 regularizeSubTrees 0 _  = error "Cannot shrink tree"
-regularizeSubTrees depth trees = map (regularizeSubTree (depth -1)) trees
---let x = map .....  
--- in trace (show x) x
-            --we compare the inner yamlTreewith desired depth we want
-
+regularizeSubTrees depth trees = map (regularizeSubTree (depth -1)) trees --mapping regularizeSubTree over the list of subtrees
+--function takes a depth and a tuple representing a key-value pair in a sub-tree. It checks if the current depth of the value (val) matches the desired depth. If it does not match, it calls the addLevel function to add empty levels to the val to match the desired depth. Otherwise unchanged
 regularizeSubTree :: Int -> (String, YamlTree) -> (String, YamlTree)
 regularizeSubTree depth a@(key, val) =
     let (key', YamlTree val') = if depthi val /= depth then addLevel (depth - depthi val) (key, val)
-                                     else a-- make if part a binding andcall it inregularizeSubTrees
+                                     else a-- make if part a binding and call it in regularizeSubTrees
     in (key', YamlTree (regularizeSubTrees depth val'))
 
 addLevel :: Int ->(String, YamlTree) -> (String, YamlTree)
@@ -256,29 +244,27 @@ treeToList (YamlTree trees) = trees
 -- "WARNING: instrument "EUR" occurs in multiple places in hierarchy:
 -- "currencies - currencies - usd-fx - EUR"
 -- "currencies - currencies - eur-fx - EUR""
--- data YamlTree = YamlTree [(String, YamlTree)]
 
 type Path = [String]
-
+--returning a Map where the keys are leaf lables and values are list of paths to those leafs in YamlTree. In the beginning I worked with lists but Map is more efficient
 leafCounts' :: [(String, YamlTree)] -> Path -> Map.Map String [Path]
 leafCounts' [] _ = Map.empty
 leafCounts' ((k,v) : kvs) path
   | isLeaf (k,v) = Map.insertWith (\x y -> x ++ y) k [reverse (k : path)] (leafCounts' kvs path)
   | otherwise = Map.unionWith (\x y -> x ++ y) (leafCounts' (treeToList v) (k : path)) (leafCounts' kvs path)
-
+--we want to know each leaf, its counts, and the paths to that leaf lable in YamlTree
 leafDict :: [(String, YamlTree)] -> [String] -> [(String, Int, [[String]])]
 leafDict [] _ = []
 leafDict ((k, v) : kvs) path
   | isLeaf (k, v) = [(k, 1, [reverse (k : path)])] ++ leafDict kvs path
   | otherwise = leafDict (treeToList v) (k : path) ++ leafDict kvs path
---maybe use map(\) instead of this later
---[(leaf1, 1, path1), (leaf2, 1, path2)..]
+--function leafCount takes a tuple containing a leaf label, its count, and a path and a list of tuples, and returns a modified list of tuples with updated counts and paths for the given label.
 leafCount :: (String, Int, [String]) -> [(String, Int, [[String]])] -> [(String, Int, [[String]])]
 leafCount (k, v, path) kvs =
   case L.find (\(k', _, _) -> k' == k) kvs of
     Just (k', count, paths) -> (k', count + v, paths ++ [path]) : filter (\(k'', _, _) -> k'' /= k) kvs
     Nothing -> (k, v, [path]) : kvs
-
+--function leafCounts takes a YamlTree and returns a list of tuples where the first element is a label of a leaf node, and the second element is a list of paths to that leaf node.
 leafCounts :: YamlTree -> [(String, [[String]])]
 leafCounts (YamlTree []) = []
 leafCounts (YamlTree kvs) =
@@ -289,7 +275,7 @@ leafCounts (YamlTree kvs) =
           else [(k, [path ++ [k] | path <- concat [ps | (_, ps) <- leafCounts v]])] --If the value is not a leaf, recursively call leafCounts on the value and add the resulting list of tuples to the result list with the key as the label.
     ) kvs --else part means if this is not a leaf then something else is. which should be found recursively with leafCounts until leaf
 
-  -- Check for overlapping labels in the leaf nodes and print warnings
+-- Check for overlapping labels in the leaf nodes and print warnings
 checkOverlappingLabels :: [(String, [[String]])] -> IO ()
 checkOverlappingLabels pathsList = do
   let overlappingLabels = L.filter (\(_,paths) -> length paths > 1) pathsList
@@ -298,12 +284,12 @@ checkOverlappingLabels pathsList = do
 isLeaf :: (String, YamlTree) -> Bool
 isLeaf (_, YamlTree []) = True
 isLeaf _ = False
-
+--The function takes two arguments: label, which is the leaf label for which the warning is generated, and pathsList, which is a list of tuples where the first element is a label of a leaf node, and the second element is a list of paths to that leaf node
 printWarning :: String -> [(String, [[String]])] -> IO ()
 printWarning label pathsList = case L.find (\(l,_) -> l == label) pathsList of
                                   Just (_, paths) -> do
                                     putStrLn $ "WARNING: instrument \"" ++ label ++ "\" occurs in multiple places in hierarchy:"
-                                    mapM_ (\path -> putStrLn $ "-- \"" ++ (unwords path) ++ "\"") paths
+                                    mapM_ (\path -> putStrLn $ "-- \"" ++ (unwords path) ++ "\"") paths --Each path is converted to a string using unwords to concatenate the elements with spaces, and it is enclosed in double quotes (-- "path")
                                   Nothing -> return ()
 ----------q8
 --Write a function longestPath :: YamlTree -> [String] that finds the longest path in a YamlTree.
