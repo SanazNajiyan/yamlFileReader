@@ -65,7 +65,7 @@ By definition of depth, the depth of the current tree is equal to the maximum of
 
 length (longestPath (YamlTree ((s1, t1) : rest))) = length (s2 : longestPath t2) -- by (2) 
 
-This case will be the same as case 1 since we deal with the data structure YamlTree with a list of tuples 
+This case will be the same as case 1 since we deal with the same data structure YamlTree with a list of tuples 
 
 Both cases are essentially the same because they both deal with the YamlTree data structure represented as a list of tuples. In both cases, we start from the longest path applied to a subtree, and then we show that we arrive at the depth corresponding to the entire YamlTree. So, we only need to consider one case instead of two.
 
