@@ -22,7 +22,6 @@ import Data.Ord (comparing)
 import Control.Monad as MO (when)
 import qualified Data.Char as C
 import qualified Data.Yaml as Y
-import qualified Data.Yaml.Parser as Y
 import qualified Data.Yaml.Builder as YB
 import Data.Aeson.Types (FromJSON(..), Value(..), withObject, parseJSON)
 import qualified Data.Yaml as Y (encode, decode)
