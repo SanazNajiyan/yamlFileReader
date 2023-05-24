@@ -246,36 +246,14 @@ treeToList (YamlTree trees) = trees
 -- "currencies - currencies - eur-fx - EUR""
 
 type Path = [String]
---returning a Map where the keys are leaf lables and values are list of paths to those leafs in YamlTree. In the beginning I worked with lists but Map is more efficient
+--LeafCounts' keeps track of how many times each leaf label appears and the different paths that lead to those labels 
 leafCounts' :: [(String, YamlTree)] -> Path -> Map.Map String [Path]
 leafCounts' [] _ = Map.empty
 leafCounts' ((k,v) : kvs) path
-  | isLeaf (k,v) = Map.insertWith (\x y -> x ++ y) k [reverse (k : path)] (leafCounts' kvs path)
-  | otherwise = Map.unionWith (\x y -> x ++ y) (leafCounts' (treeToList v) (k : path)) (leafCounts' kvs path)
---we want to know each leaf, its counts, and the paths to that leaf lable in YamlTree
-leafDict :: [(String, YamlTree)] -> [String] -> [(String, Int, [[String]])]
-leafDict [] _ = []
-leafDict ((k, v) : kvs) path
-  | isLeaf (k, v) = [(k, 1, [reverse (k : path)])] ++ leafDict kvs path
-  | otherwise = leafDict (treeToList v) (k : path) ++ leafDict kvs path
---function leafCount takes a tuple containing a leaf label, its count, and a path and a list of tuples, and returns a modified list of tuples with updated counts and paths for the given label.
-leafCount :: (String, Int, [String]) -> [(String, Int, [[String]])] -> [(String, Int, [[String]])]
-leafCount (k, v, path) kvs =
-  case L.find (\(k', _, _) -> k' == k) kvs of
-    Just (k', count, paths) -> (k', count + v, paths ++ [path]) : filter (\(k'', _, _) -> k'' /= k) kvs
-    Nothing -> (k, v, [path]) : kvs
---function leafCounts takes a YamlTree and returns a list of tuples where the first element is a label of a leaf node, and the second element is a list of paths to that leaf node.
-leafCounts :: YamlTree -> [(String, [[String]])]
-leafCounts (YamlTree []) = []
-leafCounts (YamlTree kvs) =
-  concatMap
-    ( \(k, v) ->
-        if isLeaf (k, v) --If the value is a leaf, add a tuple to the result list with the key as the label and a list of paths that lead to the label. The paths are obtained by calling the leafCount function, which recursively counts the occurrence of the label in the tree and returns the paths that lead to it.
-          then [(k, [(k : concat paths) | (_, _, paths) <- leafCount (k, 1, []) (leafDict kvs [])])]
-          else [(k, [path ++ [k] | path <- concat [ps | (_, ps) <- leafCounts v]])] --If the value is not a leaf, recursively call leafCounts on the value and add the resulting list of tuples to the result list with the key as the label.
-    ) kvs --else part means if this is not a leaf then something else is. which should be found recursively with leafCounts until leaf
+  | isLeaf (k,v) = Map.insertWith (\x y -> x ++ y) k [reverse (k : path)] (leafCounts' kvs path) --if it is a leaf it constructs a new key-value pair in the Map. value is a list containing reversed path
+  | otherwise = Map.unionWith (\x y -> x ++ y) (leafCounts' (treeToList v) (k : path)) (leafCounts' kvs path) --otherwise recurse on leafCounts' to process remaining tuple Map.unionWith is used to merge the resulting Map. it concatenates the list of paths for common keys
 
--- Check for overlapping labels in the leaf nodes and print warnings
+-- checkOverlappingLables's purpose is to identify any leaf labels that occur in multiple places and showing different paths they occur
 checkOverlappingLabels :: [(String, [[String]])] -> IO ()
 checkOverlappingLabels pathsList = do
   let overlappingLabels = L.filter (\(_,paths) -> length paths > 1) pathsList
@@ -284,12 +262,12 @@ checkOverlappingLabels pathsList = do
 isLeaf :: (String, YamlTree) -> Bool
 isLeaf (_, YamlTree []) = True
 isLeaf _ = False
---The function takes two arguments: label, which is the leaf label for which the warning is generated, and pathsList, which is a list of tuples where the first element is a label of a leaf node, and the second element is a list of paths to that leaf node
+--printWarning takes two arguments: label, which is the leaf label for which the warning is generated, and pathsList, which is a list of tuples where the first element is a label of a leaf node, and the second element is a list of paths to that leaf node
 printWarning :: String -> [(String, [[String]])] -> IO ()
 printWarning label pathsList = case L.find (\(l,_) -> l == label) pathsList of
                                   Just (_, paths) -> do
                                     putStrLn $ "WARNING: instrument \"" ++ label ++ "\" occurs in multiple places in hierarchy:"
-                                    mapM_ (\path -> putStrLn $ "-- \"" ++ (unwords path) ++ "\"") paths --Each path is converted to a string using unwords to concatenate the elements with spaces, and it is enclosed in double quotes (-- "path")
+                                    mapM_ (\path -> putStrLn $ " \"" ++ (unwords path) ++ "\"") paths --Each path is converted to a string using unwords to concatenate the elements with spaces, and it is enclosed in double quotes (-- "path")
                                   Nothing -> return ()
 ----------q8
 --Write a function longestPath :: YamlTree -> [String] that finds the longest path in a YamlTree.
@@ -307,8 +285,10 @@ data WYTree = WYTree [(String, Float, WYTree)] deriving Show
 --q10: Define a parameterized datatype data PYamlTree a = ... such that YamlTree and WeightedYamlTree could be reimplemented as special cases of it. Please make PYamlTree an instance of Functor and use fmap to define a function that "throws away the weights" of a WeightedYamlTree to produce the underlying YamlTree.
 data PYamlTree a = PYamlTree a [(String, PYamlTree a)] deriving Show
 --To make PYamlTree an instance of Functor, we can define the following fmap function:
+--it applies the function f to the value x, creating a new transformed value f x.
+--then, it recursively applies fmap f to each child node in the list ts. This means that it calls fmap f on each child node and obtains a new transformed child node.
 instance Functor PYamlTree where
-  fmap f (PYamlTree x ts) = PYamlTree (f x) [(k, fmap f t) | (k, t) <- ts] --to test construct a tree and fmap (+1) ..
+  fmap f (PYamlTree x ts) = PYamlTree (f x) [(k, fmap f t) | (k, t) <- ts] 
 --q11:Define a function find :: String -> YamlTree -> Bool that checks whether a node with a certain String label exists in a YamlTree. Please explain how the laziness of Haskell affects the efficiency of find.
 
 find' :: String -> YamlTree -> Bool
@@ -319,11 +299,10 @@ find' key (YamlTree ts) = any (checkKey key) ts || any (find' key . snd) ts
 ----------answer of the effect of laziness:
 -- find' searches the tree as far as necessary to find the node with the
 -- specified label. This means that if the label is found early in the tree, the
--- function will terminate quickly, without searching the rest of the tree. On
--- the other hand. Yet, Haskell's lazy (early exit)
--- evaluation allows for efficient searching of large trees, since it only
+-- function will terminate quickly, without searching the rest of the tree(early exit)
+-- minimum evaluation allows for efficient searching of large trees, since it only
 -- evaluates the parts of the tree that are needed to find the label.
-
+------------------------------------------------------------------------------------
 --q12:Write an interactive (IO) program that does a depth-first traversal of a
 --YamlTree that asks the user to specify weights for each subtree to
 --interactively convert the original YamlTree into a WeightedYamlTree. It should
@@ -348,9 +327,7 @@ isEqualWeightNested [] = return True
 isEqualWeightNested treeStrings
   | any (\x -> length x /= length (head treeStrings)) treeStrings = return False
   | otherwise = return $ all (\x -> x == head treeStrings) treeStrings
---issues: first question asked 2wice. we have a look us10,..
---don't forget to fix the root question as a notification
---issue: Please specify relative weight of "OAT BTP"!
+
 promptForWeights :: [String] -> IO [Float]
 promptForWeights parents = do
  -- putStrLn $ "Please specify relative weight of each parent:"
@@ -506,7 +483,14 @@ main = do
     ---here I tested my quickCheck tests
     -- Q.quickCheck prop_isRegular
    --Q.quickCheck (prop_my_io_action) --cabal run yamltree= if u want to run the application  / cabal test= if u want to run the test
-      -------------nr.2 choice with reasonable maxKeyLength and levels---------
+     
+   
+   
+   
+   
+   
+   
+   -------------nr.2 choice with reasonable maxKeyLength and levels---------
 -- instance Q.Arbitrary YamlTree where
 --     arbitrary = Q.sized (arbitraryYamlTree 5)
     
@@ -529,5 +513,3 @@ main = do
 --     keyLength <- Q.choose (1, 8)
 --     key <- replicateM keyLength (Q.elements validChars)
 --     return $ if null key then "default_key" else key  
---C:\Users\sanaz\source\yamlFileReader\instrument_hierarchy_weighted.yaml
---C:\Users\sanaz\instruments-hierarchy.yaml
