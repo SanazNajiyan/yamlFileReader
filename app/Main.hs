@@ -47,7 +47,6 @@ import Data.List.Split (splitOn)
 
 --We (recursively) call a YamlTree regular if all of its (proper) subtrees have the same depth and are regular themselves. Please implement a QuickCheck test that checks whether a YamlTree is regular.
 
-
 data YamlTree = YamlTree [(String, YamlTree)]
     deriving (Ord, Eq, Show, Generic)
 
@@ -401,39 +400,150 @@ normalizeWeights parentWeight (YamlTree cs) = do
                wyTree <- normalizeWeights weight yamlTree
                return (name, weight, wyTree)) (zip cs normalized)
              return (WYTree subtrees)
+--12. code is wrong: you are missing a reverse; also leaf weights do not work; have you tested this?
 
 --q13:Now, please write a pretty printer for WeightedYamlTrees that produces
 --"instruments_hierarchy_weighted.yaml" for the YamlTree corresponding to
 --"instruments_hierarchy_regular.yaml", for example. (Again, no hard-coding!)
 ----e.g.##            us-long-bonds: 0.022/instruments - 0.11/bonds - 0.33/long-bonds
 
+-- wyTreePrint' :: WYTree -> String
+-- wyTreePrint' (WYTree x) = "instrument_weights:\n" ++ concatMap (\y -> wyTreePrint y [("instruments", 1.0, False)]) x
+
+-- wyTreePrint :: (String, Float, WYTree) -> [(String, Float, Bool)] -> String
+-- wyTreePrint (name, weight, (WYTree ts)) parents =
+--   let
+--     depth = length parents
+--     portionPerParent = replicatePortions parents weight
+--     indentation = concat (replicate depth "    ")
+--     isLeaf = null ts
+--     comment = if isLeaf then " " else " ##"
+--   in
+--     comment ++ indentation ++ name ++ ": " ++ portionPerParent ++ "\n" ++
+--     concatMap (\tr -> wyTreePrint tr (parents ++ [(name, weight, isLeaf)])) ts
+
+-- formatFloat :: Float -> String
+-- formatFloat f = printf "%.2f" f
+
+-- portions :: [(String, Float, Bool)] -> Float -> [String]
+-- portions [] _ = []
+-- portions ((parent, parentWeight, _):rest) weight = (formatFloat (weight / parentWeight) ++ "/" ++ parent) : portions rest weight
+
+-- replicatePortions :: [(String, Float, Bool)] -> Float -> String
+-- replicatePortions ps@((_, _, isLeaf):_) w =
+--   if isLeaf
+--     then L.intercalate " - " (leafPortions (portions ps w))
+--     else L.intercalate " - " (portions ps w)
+
+-- leafPortions :: [String] -> [String]
+-- leafPortions portions =
+--   let
+--     lists = splitOn " - " (unwords portions)
+--     initOf = init lists
+--     takeWeight = takeWhile (/= "/") initOf
+--     addtoTake = takeWeight ++ ["##"]
+--     final = addtoTake ++ tail (dropWhile (/= "/") (tail lists))  -- Skip the first weight after ##
+--   in
+--     final
+
+-- wyTreePrint' :: WYTree -> String
+-- wyTreePrint' (WYTree x) = "instrument_weights:\n" ++ concatMap (\y -> wyTreePrint y [("instruments", 1.0, False)]) x
+
+-- wyTreePrint :: (String, Float, WYTree) -> [(String, Float, Bool)] -> String
+-- wyTreePrint (name, weight, (WYTree ts)) parents =
+--   let
+--     depth = length parents
+--     portionPerParent = replicatePortions parents weight
+--     indentation = concat (replicate depth "    ")
+--     isLeaf = length ts == 0
+--     comment = if isLeaf then " " else " ##"
+--   in
+--     comment ++ indentation ++ name ++ ": " ++ portionPerParent ++ "\n" ++
+--     concatMap (\tr -> wyTreePrint tr (parents ++ [(name, weight, isLeaf)])) ts
+
+-- formatFloat :: Float -> String
+-- formatFloat f = printf "%.2f" f
+
+-- portions :: [(String, Float, Bool)] -> Float -> [String]
+-- portions [] _ = []
+-- portions ((parent, parentWeight, isLeaf):rest) weight =
+--   let
+--     formattedWeight = if isLeaf then formatFloat (weight / parentWeight) ++ " ##" else formatFloat (weight / parentWeight)
+--     result = formattedWeight ++ "/" ++ parent
+--   in
+--     result : portions rest weight
+-- --trace ("Portion (isLeaf=" ++ show isLeaf ++ "): " ++ result) $ --before result
+-- replicatePortions :: [(String, Float, Bool)] -> Float -> String
+-- replicatePortions ps@((_, _, isLeaf):_) w =
+--   if isLeaf
+--     then L.intercalate " - " (leafPortions (portions ps w))
+--     else L.intercalate " - " (portions ps w)
+
+-- leafPortions :: [String] -> [String]
+-- leafPortions portions =
+--   let
+--     lists = splitOn " - " (unwords portions)
+--     initOf = init lists
+--     takeWeight = takeWhile (/= "/") initOf
+--     addtoTake = takeWeight ++ ["##"]
+--     final = addtoTake ++ tail (dropWhile (/= "/") (tail lists))  -- Skip the first weight after ##
+--   in
+--     final
+
 
 wyTreePrint' :: WYTree -> String
-wyTreePrint' (WYTree x) = "instrument_weights:\n" ++ concatMap (\y -> wyTreePrint y [("instruments", 1.0)]) x
+wyTreePrint' (WYTree x) = "instrument_weights:\n" ++ concatMap (\y -> wyTreePrint y [("instruments", 1.0, False)]) x
 
-wyTreePrint :: (String, Float, WYTree) -> [(String, Float)] -> String
-wyTreePrint (name, weight, (WYTree ts)) parents = let
-  depth = length parents
-  portionPerParent = replicatePortions parents weight -- format the weight here
-  indentation = concat $ replicate depth "    "
-  isLeaf = length ts == 0
-  comment = if isLeaf
-    then "  "
-    else "##"
+wyTreePrint :: (String, Float, WYTree) -> [(String, Float, Bool)] -> String
+wyTreePrint (name, weight, (WYTree ts)) parents =
+  let
+    depth = length parents
+    portionPerParent = replicatePortions parents weight
+    indentation = concat (replicate depth "    ")
+    isLeaf = length ts == 0
+    comment = if isLeaf then " " else " ##"
   in
     comment ++ indentation ++ name ++ ": " ++ portionPerParent ++ "\n" ++
-      concatMap (\tr -> wyTreePrint tr (parents ++ [(name, weight)])) ts
+    concatMap (\tr -> wyTreePrint tr (parents ++ [(name, weight, isLeaf)])) ts
 
 formatFloat :: Float -> String
 formatFloat f = printf "%.2f" f
 
-replicatePortions :: [(String, Float)] -> Float -> String
-replicatePortions ps w = L.intercalate " - " (portions ps w)
-
-portions :: [(String, Float)] -> Float -> [String]
+portions :: [(String, Float, Bool)] -> Float -> [String]
 portions [] _ = []
-portions ((parent, parentWeight):rest) weight = (formatFloat (weight/parentWeight) ++ "/" ++ parent) : portions rest weight
+portions ((parent, parentWeight, isLeaf):rest) weight =
+  let
+    formattedWeight = if isLeaf then formatFloat (weight / parentWeight) ++ " ##" else formatFloat (weight / parentWeight)
+    result = formattedWeight ++ "/" ++ parent
+    traceMsg = "PORTIONS: " ++ result
+  in
+    trace traceMsg portions rest weight
 
+replicatePortions :: [(String, Float, Bool)] -> Float -> String
+replicatePortions ps@((_, _, isLeaf):_) w =
+  if isLeaf
+    then L.intercalate " - " (leafPortions (portions ps w))
+    else L.intercalate " - " (portions ps w)
+
+
+leafPortions :: [String] -> [String]
+leafPortions portions =
+  let
+    lists = splitOn " - " (unwords portions)
+    initOf = init lists
+    takeWeight = takeWhile (/= "/") initOf
+    addtoTake = takeWeight ++ ["##"]
+    final = addtoTake ++ tail (dropWhile (/= "/") (tail lists))  -- Skip the first weight after ##
+    traceMsg = "SANAZ: " ++ unwords final
+  in
+    trace traceMsg final
+    
+
+
+
+
+
+--instruments-hierarchy.yaml
 --q.14
 -- Finally, put all the pieces together into an interactive program that
 -- - reads in a yaml file at a user-specified path (e.g. "/home/henkie/generated_configs/instrument_hierarchy.yaml")
@@ -452,6 +562,7 @@ main = do
     yamlValueInput <- parse path
     let yamlTree' = convertToYAMLTree yamlValueInput
     let yamlTree = postProcessYamlTree yamlTree'
+    print yamlTree
 -- - regularizer into a regular YamlTree, producing a YamlTree that would pretty print to "instruments-hierarchy-regular.yaml" for our particular example
     putStrLn " "
     let regularized = regularize yamlTree
