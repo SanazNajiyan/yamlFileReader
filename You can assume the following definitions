@@ -1,0 +1,52 @@
+You can assume the following definitions.
+
+data YamlTree = YamlTree [(String, YamlTree)]
+example :: YamlTree
+example = YamlTree [("Animal", YamlTree [("Dog", YamlTree []),
+
+                                         ("Cat", YamlTree [])]),
+
+                    ("Fruit", YamlTree [("Apple", YamlTree [("Pink Lady", YamlTree [])]),
+
+                                        ("Pear", YamlTree [])])]
+
+
+
+
+depth :: YamlTree -> Int
+depth (YamlTree [])     = 0 -- (a)
+depth (YamlTree (x:xs)) = 1 + maximum ((depth . snd) x : map (depth . snd) xs) -- (b)
+
+
+longestPath :: YamlTree -> [String]
+longestPath (YamlTree []) = [] -- (c)
+longestPath (YamlTree xs) = let (k, v) = maxDepthPair xs in k : longestPath v -- (d)
+
+length :: [a] -> Int
+length []       = 0 -- (e)
+length (_ : xs) = 1 + length xs -- (f)
+
+maxDepthPair :: [(String, YamlTree)] -> (String, YamlTree)
+maxDepthPair [x] = x -- (g)
+maxDepthPair (x:xs)
+    | depth (snd x) >= depth (snd (maxDepthPair xs)) = x -- (h)
+    | otherwise = maxDepthPair xs -- (i)
+
+
+
+maximum :: [Int] -> Int
+maximum [x]      = x -- (j)
+maximum (x : xs) = max x (maximum xs) -- (k)
+
+map :: (a -> b) -> [a] -> [b]
+map _ []       = [] -- (l)
+map f (x : xs) = f x : map f xs -- (m)
+
+snd :: (a, b) -> b
+snd (_, y) = y -- (n)
+
+max :: Int -> Int -> Int
+max x y = if x > y then x else y -- (o)
+
+(.) :: (b -> c) -> (a -> b) -> (a -> c)
+(.) f g x = f (g x) -- (p)
