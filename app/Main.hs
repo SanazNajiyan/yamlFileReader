@@ -312,7 +312,7 @@ find' key (YamlTree ts) = any (checkKey key) ts || any (find' key . snd) ts
 --parent node. For the case of a single child node, no input should be asked
 --from the user as no weighting decision has the be made. The whole tree should
 --be assigned weight 1
--- Depth-first traversal of YamlTree to convert it into a WeightedYamlTree
+-- my approach: Depth-first traversal of YamlTree and convert it into a WeightedYamlTree
 
 userWeightRequest :: YamlTree -> IO WYTree
 userWeightRequest yamlTree@(YamlTree cs) = normalizeWeights 1.0 yamlTree
@@ -372,35 +372,68 @@ isEqualWeight parents = do
     _ -> return True
 
 -- YamlTree [(String, YamlTree [])] this is leaf
+-- normalizeWeights :: Float -> YamlTree -> IO WYTree
+-- normalizeWeights _ (YamlTree []) = return (WYTree [])
+-- normalizeWeights x (YamlTree [(y, YamlTree [])]) = return (WYTree [(y, x, WYTree [])])
+-- normalizeWeights parentWeight (YamlTree cs) = do
+--   equal <- isEqualWeight (map fst cs)
+--   if equal
+--     then do
+--       putStrLn $ "Equal weighting \"" ++ L.intercalate " : " (map fst cs) ++ "\"!"
+--       let subTrees = map snd cs
+--       let treeStrings = map (map fst . treeToList . snd) cs
+--       equalNested <- isEqualWeightNested treeStrings
+--       let weight = parentWeight / fromIntegral (length cs)
+--       subtrees <- mapM (\(name, yamlTree) -> normalizeWeights weight yamlTree) cs
+--       return $ WYTree $ zipWith (\((n, _), ts) t -> (n, weight, t)) (zip cs treeStrings) subtrees
+--     else if length cs == 1
+--            then do
+--              putStrLn $ "Category \"" ++ (fst $ head cs) ++ "\" only has a single option, so no weighting decision to make!"
+--              return $ WYTree [(fst $ head cs, parentWeight, WYTree [])]
+--            else do
+--              putStrLn $ "Not equal weighting \"" ++ L.intercalate " : " (map fst cs) ++ "\"!"
+--              weights <- promptForWeights (map fst cs)
+--              let treeStrings = map (map fst . treeToList . snd) cs
+--              equalNested <- isEqualWeightNested treeStrings
+--              let totalWeight = sum weights
+--              let normalized = map (\x -> (x / totalWeight) * parentWeight) weights
+--              subtrees <- mapM (\((name, yamlTree), weight) -> do
+--                wyTree <- normalizeWeights weight yamlTree
+--                return (name, weight, wyTree)) (zip cs normalized)
+--              return (WYTree subtrees)
 normalizeWeights :: Float -> YamlTree -> IO WYTree
 normalizeWeights _ (YamlTree []) = return (WYTree [])
 normalizeWeights x (YamlTree [(y, YamlTree [])]) = return (WYTree [(y, x, WYTree [])])
-normalizeWeights parentWeight (YamlTree cs) = do
-  equal <- isEqualWeight (map fst cs)
-  if equal
+normalizeWeights parentWeight (YamlTree cs) =
+  if length cs == 1
     then do
-      putStrLn $ "Equal weighting \"" ++ L.intercalate " : " (map fst cs) ++ "\"!"
-      let subTrees = map snd cs
+      putStrLn $ "Category \"" ++ (fst $ head cs) ++ "\" only has a single option, so no weighting decision to make!"
+      return $ WYTree [(fst $ head cs, parentWeight, WYTree [])]
+      let treeStrings = map (map fst . treeToList . snd) cs
+      subtrees <- mapM (\(name, yamlTree) -> normalizeWeights parentWeight yamlTree) cs
+      return $ WYTree $ zipWith (\((n, _), ts) t -> (n, parentWeight, t)) (zip cs treeStrings) subtrees
+  else do
+    equal <- isEqualWeight (map fst cs)
+    if equal
+      then do
+        putStrLn $ "Equal weighting \"" ++ L.intercalate " : " (map fst cs) ++ "\"!"
+        let subTrees = map snd cs
+        let treeStrings = map (map fst . treeToList . snd) cs
+        equalNested <- isEqualWeightNested treeStrings
+        let weight = parentWeight / fromIntegral (length cs)
+        subtrees <- mapM (\(name, yamlTree) -> normalizeWeights weight yamlTree) cs
+        return $ WYTree $ zipWith (\((n, _), ts) t -> (n, weight, t)) (zip cs treeStrings) subtrees
+    else do
+      putStrLn $ "Not equal weighting \"" ++ L.intercalate " : " (map fst cs) ++ "\"!"
+      weights <- promptForWeights (map fst cs)
       let treeStrings = map (map fst . treeToList . snd) cs
       equalNested <- isEqualWeightNested treeStrings
-      let weight = parentWeight / fromIntegral (length cs)
-      subtrees <- mapM (\(name, yamlTree) -> normalizeWeights weight yamlTree) cs
-      return $ WYTree $ zipWith (\((n, _), ts) t -> (n, weight, t)) (zip cs treeStrings) subtrees
-    else if length cs == 1
-           then do
-             putStrLn $ "Category \"" ++ (fst $ head cs) ++ "\" only has a single option, so no weighting decision to make!"
-             return $ WYTree [(fst $ head cs, parentWeight, WYTree [])]
-           else do
-             putStrLn $ "Not equal weighting \"" ++ L.intercalate " : " (map fst cs) ++ "\"!"
-             weights <- promptForWeights (map fst cs)
-             let treeStrings = map (map fst . treeToList . snd) cs
-             equalNested <- isEqualWeightNested treeStrings
-             let totalWeight = sum weights
-             let normalized = map (\x -> (x / totalWeight) * parentWeight) weights
-             subtrees <- mapM (\((name, yamlTree), weight) -> do
-               wyTree <- normalizeWeights weight yamlTree
-               return (name, weight, wyTree)) (zip cs normalized)
-             return (WYTree subtrees)
+      let totalWeight = sum weights
+      let normalized = map (\x -> (x / totalWeight) * parentWeight) weights
+      subtrees <- mapM (\((name, yamlTree), weight) -> do
+        wyTree <- normalizeWeights weight yamlTree
+        return (name, weight, wyTree)) (zip cs normalized)
+      return (WYTree subtrees)
 --12. code is wrong: you are missing a reverse; also leaf weights do not work; have you tested this?
 
 --q13:Now, please write a pretty printer for WeightedYamlTrees that produces
@@ -429,7 +462,7 @@ wyTreePrint (name, weight, (WYTree ts)) parents =
     concatMap (\tr -> wyTreePrint tr (parents ++ [(name, weight)])) ts
 
 formatFloat :: Float -> String
-formatFloat f = printf "%.3f" f
+formatFloat f = printf "%.2f" f
 
 portions :: [(String, Float)] -> Float -> [String]
 portions [] _ = []
