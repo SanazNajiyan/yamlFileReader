@@ -200,3 +200,4 @@ length (("st": longestPath (YamlTree zs))
 = f
 depth (YamlTree zs)
 = I.H.
+Therefore, by applying equational reasoning and induction, we have shown that for any YamlTree t, the equality length . longestPath t = depth t holds. This demonstrates the equivalence between the length of the longest path in a YamlTree and its depth.
