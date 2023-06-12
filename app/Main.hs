@@ -515,9 +515,8 @@ portions ((parent, parentWeight, isLeaf):rest) weight =
   let
     formattedWeight = if isLeaf then formatFloat (weight / parentWeight) ++ " ##" else formatFloat (weight / parentWeight)
     result = formattedWeight ++ "/" ++ parent
-    traceMsg = "PORTIONS: " ++ result
   in
-    trace traceMsg portions rest weight
+    result : portions rest weight
 
 replicatePortions :: [(String, Float, Bool)] -> Float -> String
 replicatePortions ps@((_, _, isLeaf):_) w =
