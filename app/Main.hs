@@ -371,10 +371,10 @@ isEqualWeight parents = do
     "no" -> return False
     _ -> return True
 
-
+-- YamlTree [(String, YamlTree [])] this is leaf
 normalizeWeights :: Float -> YamlTree -> IO WYTree
 normalizeWeights _ (YamlTree []) = return (WYTree [])
-normalizeWeights x (YamlTree [(y, YamlTree [])]) = return (WYTree [(y, x, WYTree [])]) --change I made
+normalizeWeights x (YamlTree [(y, YamlTree [])]) = return (WYTree [(y, x, WYTree [])])
 normalizeWeights parentWeight (YamlTree cs) = do
   equal <- isEqualWeight (map fst cs)
   if equal
@@ -411,57 +411,40 @@ normalizeWeights parentWeight (YamlTree cs) = do
 
 
 wyTreePrint' :: WYTree -> String
-wyTreePrint' (WYTree x) = "instrument_weights:\n" ++ concatMap (\y -> wyTreePrint y [("instruments", 1.0, False)]) x
+wyTreePrint' (WYTree x) = "instrument_weights:\n" ++ concatMap (\y -> wyTreePrint y []) x
 
-wyTreePrint :: (String, Float, WYTree) -> [(String, Float, Bool)] -> String
+wyTreePrint :: (String, Float, WYTree) -> [(String, Float)] -> String
 wyTreePrint (name, weight, (WYTree ts)) parents =
   let
     depth = length parents
     portionPerParent = replicatePortions parents weight
     indentation = concat (replicate depth "    ")
     isLeaf = length ts == 0
-    comment = if isLeaf then " " else " ##"
+    comment = if isLeaf then "      " else "##    "
+    nodeValue = if isLeaf
+      then formatFloat weight ++ " ## "
+      else formatFloat weight ++ "/instruments - "
   in
-    comment ++ indentation ++ name ++ ": " ++ portionPerParent ++ "\n" ++
-    concatMap (\tr -> wyTreePrint tr (parents ++ [(name, weight, isLeaf)])) ts
+    comment ++ indentation ++ name ++ ": " ++ nodeValue ++ portionPerParent ++ "\n" ++
+    concatMap (\tr -> wyTreePrint tr (parents ++ [(name, weight)])) ts
 
 formatFloat :: Float -> String
-formatFloat f = printf "%.2f" f
+formatFloat f = printf "%.3f" f
 
-portions :: [(String, Float, Bool)] -> Float -> [String]
+portions :: [(String, Float)] -> Float -> [String]
 portions [] _ = []
-portions ((parent, parentWeight, isLeaf):rest) weight =
+portions ((parent, parentWeight):rest) weight =
   let
-    formattedWeight = if isLeaf then formatFloat (weight / parentWeight) ++ " ##" else formatFloat (weight / parentWeight)
+    formattedWeight = formatFloat (weight / parentWeight)
     result = formattedWeight ++ "/" ++ parent
   in
     result : portions rest weight
 
-replicatePortions :: [(String, Float, Bool)] -> Float -> String
-replicatePortions ps@((_, _, isLeaf):_) w =
-  if isLeaf
-    then L.intercalate " - " (leafPortions (portions ps w))
-    else L.intercalate " - " (portions ps w)
+replicatePortions :: [(String, Float)] -> Float -> String
+replicatePortions ps w = L.intercalate " - " (portions ps w)
 
 
-leafPortions :: [String] -> [String]
-leafPortions portions =
-  let
-    lists = splitOn " - " (unwords portions)
-    initOf = init lists
-    takeWeight = takeWhile (/= "/") initOf
-    addtoTake = takeWeight ++ ["##"]
-    final = addtoTake ++ tail (dropWhile (/= "/") (tail lists))  -- Skip the first weight after ##
-    traceMsg = "SANAZ: " ++ unwords final
-  in
-    trace traceMsg final
-    
-
-
-
-
-
---instruments-hierarchy.yaml
+--instruments-hierarchy.yaml 
 --q.14
 -- Finally, put all the pieces together into an interactive program that
 -- - reads in a yaml file at a user-specified path (e.g. "/home/henkie/generated_configs/instrument_hierarchy.yaml")
