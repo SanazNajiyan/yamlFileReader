@@ -88,6 +88,8 @@ maxDepthPair (x:xs)
     | depth (snd x) >= depth (snd (maxDepthPair xs)) = x -- (h)
     | otherwise = maxDepthPair xs -- (i)
 
+depth (snd (maxDepthPair xs)) = maximum (map (depth.snd) xs) -- (i2)
+
 maximum :: [Int] -> Int
 maximum [x]      = x -- (j)
 maximum (x : xs) = max x (maximum xs) -- (k)
@@ -105,6 +107,8 @@ max x y = if x > y then x else y -- (o)
 (.) :: (b -> c) -> (a -> b) -> (a -> c)
 (.) f g x = f (g x) -- (p)
 
+(a,b) == (c,d) => a==c && b==d -- (q)
+
 Please give a formal equational reasoning proof showing that 
 length . longestPath = depth
 
@@ -113,38 +117,36 @@ Claim: For any YamlTree t, length . longestPath t = depth t
 Proof:
 Base case: We distinguish the cases where t is a leaf so  it is of shape : YamlTree [("st", YamlTree [])]
 
+We will start from the Right Handside
 depth $ YamlTree [("st", YamlTree [])]    
-= Right Handside
-depth $ YamlTree [("st", YamlTree []): []]
-=    singleton list
-1 + maximum ((depth . snd) ("st", YamlTree [])  : map (depth . snd) []) 
 = b
-1 + maximum ((depth . snd) ("st", YamlTree []) : [])
+1 + maximum ((depth . snd) ("st", YamlTree [])  : map (depth . snd) []) 
 = l
-1 + maximum (depth YamlTree [])
+1 + maximum ((depth . snd) ("st", YamlTree []) : [])
+= p
+1 + maximum (depth (snd ("st", YamlTree [])) : [])
 = n
-1 + maximum 0
+1 + maximum ((depth YamlTree []): [])
 = a
-1  + 0
+1 + maximum (0:[])
 = j
-1
+1  + 0 = 1
 
-length . longestPath (YamlTree [("st", YamlTree [])])
-= Right Handside
-length (let (k, v) = maxDepthPair [("st", YamlTree [])] in k : longestPath v)
+length . longestPath ( YamlTree [("st", YamlTree [])] )
+= p
+length (longestPath ( YamlTree [("st", YamlTree [])] ))
 = d
-length (let (k, v) =  ("st", YamlTree []) in k : longestPath v)
+length (let (k, v) = maxDepthPair [("st", YamlTree [])] in k : longestPath v)
 = g
-length ( "st" : longestPath (YamlTree []))
-= substitution
-1 + length (longestPath (YamlTree []))
+length (let (k, v) =  ("st", YamlTree []) in k : longestPath v)
+= q
+length ("st" : longestPath YamlTree [])
+= c
+length ("st" : [])
 = f
 1 + length []
-= c
-1 + 0
-= e 
-1 
-
+= e
+1 + 0 = 1
 
 Inductive case: We assume the property holds for the children trees xs and  prove it for the node YamlTree (x:xs).
 
@@ -152,52 +154,117 @@ Induction Hypotheses:
 
 length . longestPath = depth for xs 
 length . longestPath (YamlTree xs) = depth (YamlTree xs) -- (I.H.)
-We need to show that length . longestPath = depth for YamlTree (x:xs).
+Inductive Case: We need to show:
+length . longestPath (YamlTree (x:xs)) = depth (YamlTree (x:xs))
 
-length . longestPath (YamlTree (x:xs))
-= Left Hand Side
-length (let (k, v) = maxDepthPair (x:xs) in k : longestPath v)
-= d
-length (let (k, v) = if depth (snd x) >= depth (snd (maxDepthPair xs)) then x else maxDepthPair xs in k : longestPath v)
-= h & i
-To proceed further, we need to consider these two cases:
+To prove our inductive case, we split our proof in to distinctive but complement cases.
 
 Case 1: depth (snd x) >= depth (snd (maxDepthPair xs))
-length (let (k, v) = x in k : longestPath v)
-= h
-length (fst x : longestPath (snd x))
-= d
+
+depth (YamlTree (x:xs))
+= b 
+1 + maximum ((depth . snd) x : map (depth . snd) xs)
+= p
+1 + maximum (depth (snd x) : map (depth (snd xs)))
+= k
+1+ max (depth (snd x)) (maximum (map (depth (snd xs))))
+= i2
+1 + max (depth (snd x)) (depth (snd (maxDepthPair xs)))
+= based on case 1
+
+1 + depth (snd x)
+
+= I.H.
 1 + length (longestPath (snd x))
 = f
-1 + depth (snd x)
-= I.H. 
-1 + depth (("st", YamlTree zs))
-= data definition of YamlTree
-1 + maximum ((depth . snd)("st", YamlTree zs)  : map (depth . snd) []) 
-= b
-1 + maximum ((depth . snd)("st", YamlTree zs) : [])
-= l
-1 + maximum (depth (snd ("st", YamlTree zs)))
+length (fst x : longestPath (snd x))
+= q
+length (let (k, v) = x in k : longestPath v)
+= h
+length (let (k, v) = maxDepthPair (x:xs) in k : longestPath v )
+= d
+length (longestPath (YamlTree (x:xs)))
 = p
-1 + maximum (depth (YamlTree zs))
-= n
-depth (YamlTree zs)
-= b 
+length . longestPath (YamlTree (x:xs))
 
 
 Case 2: depth (snd x) < depth (snd (maxDepthPair xs))
-maxDepthPair xs
-= i
-length (let (k, v) = maxDepthPair xs in k : longestPath v)
-= d
-length (longestPath (maxDepthPair xs))
-= d
-length (longestPath ("st", YamlTree zs))
-= substituting an example of a pair with max depth
-length (("st": longestPath (YamlTree zs))
-= d
-1 + length (longestPath (YamlTree zs))
-= f
-depth (YamlTree zs)
+
+depth (YamlTree (x:xs))
+= b 
+1 + maximum ((depth . snd) x : map (depth . snd) xs)
+= p
+1 + maximum (depth (snd x) : map (depth (snd xs)))
+= k
+1+ max (depth (snd x)) (maximum (map (depth (snd xs))))
+= i2
+1 + max (depth (snd x)) (depth (snd (maxDepthPair xs)))
+= based on case 2
+
+1 + depth (snd (maxDepthPair xs))
+
 = I.H.
-Therefore, by applying equational reasoning and induction, we have shown that for any YamlTree t, the equality length . longestPath t = depth t holds. This demonstrates the equivalence between the length of the longest path in a YamlTree and its depth.
+1 + length (longestPath (snd (maxDepthPair xs)))
+= f
+length (fst (maxDepthPair xs) : longestPath (snd (maxDepthPair xs)))
+= q
+length (let (k, v) = maxDepthPair xs in k : longestPath v)
+= i
+length (let (k, v) = maxDepthPair (x:xs) in k : longestPath v )
+= d
+length (longestPath (YamlTree (x:xs)))
+= p
+length . longestPath (YamlTree (x:xs))
+
+
+proof of i2 on induction:
+depth (snd (maxDepthPair xs)) = maximum (map (depth.snd) xs)
+
+base case:
+depth (snd (maxDepthPair [x]))
+= g
+
+depth (snd x)
+
+= j
+maximum ((depth.snd) x : [])
+= l
+maximum ((depth.snd) x : map (depth.snd) [])
+= m
+maximum (map (depth.snd) [x])
+
+Induction hypothesis:
+depth (snd (maxDepthPair xs)) = maximum (map (depth.snd) xs)
+
+Inductive case:
+depth (snd (maxDepthPair (x:xs))) = maximum (map (depth.snd) (x:xs))
+
+case 1: depth (snd x) >= depth (snd (maxDepthPair xs))
+depth (snd (maxDepthPair (x:xs)))
+= h
+
+depth (snd x)
+
+= based on case 1
+max ((depth.snd) x) (depth (snd (maxDepthPair xs)))
+= I.H
+max ((depth.snd) x) (maximum (map (depth.snd) xs))
+= k
+maximum((depth.snd) x : map (depth.snd) xs)
+= m
+maximum (map (depth.snd) (x:xs))
+
+case 2: depth (snd x) < depth (snd (maxDepthPair xs))
+depth (snd (maxDepthPair (x:xs)))
+= i
+
+depth (snd (maxDepthPair xs))
+
+= based on case 2
+max ((depth.snd) x) (depth (snd (maxDepthPair xs)))
+= I.H
+max ((depth.snd) x) (maximum (map (depth.snd) xs))
+= k
+maximum((depth.snd) x : map (depth.snd) xs)
+= m
+maximum (map (depth.snd) (x:xs))
