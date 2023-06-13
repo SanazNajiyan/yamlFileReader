@@ -141,7 +141,6 @@ yamlTreeToString (YamlTree ((key, value):rest)) =
 ---------q3-----
 --If we pretty print a YAML tree, we should be able to parse it and get the same tree back.
 --taking a generated YamlTree and check if it can be parsed back into the same tree
---The property checks whether parsing a YamlTree into a YamlValue and then pretty-printing it back into a YamlTree results in the same YamlTree
 --The prop_parser_prettyprinter function takes a YamlTree as input, converts it to text using yamlTreeToString, and then parses the text using parseYaml. If the parse is successful and the resulting tree is equal to the original input tree, the function returns True. Otherwise, it returns False.
 
 prop_my_io_action :: YamlTree -> Q.Property
@@ -206,7 +205,7 @@ prop_isRegular :: YamlTree -> Bool
 prop_isRegular = isRegular . regularize
 -----------q6
 --Write a function that "regularizes" a YamlTree into a regular one by copying levels in the hierarchy. Please ensure that this function regularizes the YamlTree implemented by "instruments-hierarchy.yaml" to the one implemented by "instruments-hierarchy-regular.yaml". (Again, we want a generally applicable solution. No hard-coding of the example allowed.)
---the idea is make all branches have the same depth even if it requires adding empty levels to shallower branches
+--the idea is to make all branches have the same depth even if it requires adding empty levels to shallower branches
 regularize :: YamlTree -> YamlTree
 regularize yamlTree@(YamlTree subTrees) =
   let maxDepth = depthi yamlTree
