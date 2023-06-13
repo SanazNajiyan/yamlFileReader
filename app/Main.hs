@@ -452,17 +452,20 @@ wyTreePrint (name, weight, (WYTree ts)) parents =
     depth = length parents
     portionPerParent = replicatePortions parents weight
     indentation = concat (replicate depth "    ")
+    hyphen = depth == 0
     isLeaf = length ts == 0
     comment = if isLeaf then "      " else "##    "
     nodeValue = if isLeaf
-      then formatFloat weight ++ " ## "
-      else formatFloat weight ++ "/instruments - "
+      then formatFloat weight ++ " ##"
+      else formatFloat weight ++ "/instruments "
+    delHyphen = if hyphen || isLeaf then " " else "- "  
   in
-    comment ++ indentation ++ name ++ ": " ++ nodeValue ++ portionPerParent ++ "\n" ++
+    comment ++ indentation ++ name ++ ": " ++ nodeValue ++ delHyphen ++ portionPerParent ++ "\n" ++
     concatMap (\tr -> wyTreePrint tr (parents ++ [(name, weight)])) ts
 
 formatFloat :: Float -> String
 formatFloat f = printf "%.2f" f
+
 
 portions :: [(String, Float)] -> Float -> [String]
 portions [] _ = []
@@ -475,7 +478,6 @@ portions ((parent, parentWeight):rest) weight =
 
 replicatePortions :: [(String, Float)] -> Float -> String
 replicatePortions ps w = L.intercalate " - " (portions ps w)
-
 
 --instruments-hierarchy.yaml 
 --q.14
