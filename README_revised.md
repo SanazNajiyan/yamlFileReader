@@ -247,7 +247,7 @@ depth (snd x)
 
 = based on case 1
 max ((depth.snd) x) (depth (snd (maxDepthPair xs)))
-= I.H
+= I.H.
 max ((depth.snd) x) (maximum (map (depth.snd) xs))
 = k
 maximum((depth.snd) x : map (depth.snd) xs)
@@ -262,7 +262,7 @@ depth (snd (maxDepthPair xs))
 
 = based on case 2
 max ((depth.snd) x) (depth (snd (maxDepthPair xs)))
-= I.H
+= I.H.
 max ((depth.snd) x) (maximum (map (depth.snd) xs))
 = k
 maximum((depth.snd) x : map (depth.snd) xs)
