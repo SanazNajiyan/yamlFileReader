@@ -117,7 +117,7 @@ Claim: for all YamlTrees t, (length . longestPath) t = depth t
 Proof:
 We distinguish the cases where t = Leaf and t = YamlTree xs
 
-Case t = Leaf
+Case t = Leaf 
 If t is a leaf, it is of shape : YamlTree [("st", YamlTree [])]
 
 length . longestPath ( YamlTree [("st", YamlTree [])] )
@@ -148,11 +148,15 @@ length ("st" : [])
 = b
 depth $ YamlTree [("st", YamlTree [])]    
 
-Case t = YamlTree xs
-We assume the Induction Hypotheses
-length . longestPath (YamlTree xs) = depth (YamlTree xs) -- (I.H.)
-Inductive Case: We need to show:
-length . longestPath (YamlTree (x:xs)) = depth (YamlTree (x:xs))
+Case t = YamlTree (x:xs) which is of shape:
+YamlTree [("st", YamlTree xs')] 
+
+We assume the Induction Hypotheses where t' = YamlTree ys
+length . longestPath (YamlTree ys) = depth (YamlTree ys) -- (I.H.)
+
+this is also of shape:
+length . longestPath YamlTree [("st", YamlTree ys')] 
+= depth (YamlTree [("st", YamlTree ys')]) 
 
 To prove our inductive case, we split our proof in to distinctive but complement cases.
 
@@ -168,9 +172,7 @@ depth (YamlTree (x:xs))
 = i2
 1 + max (depth (snd x)) (depth (snd (maxDepthPair xs)))
 = based on case 1
-
 1 + depth (snd x)
-
 = I.H.
 1 + length (longestPath (snd x))
 = f
@@ -196,9 +198,7 @@ depth (YamlTree (x:xs))
 = i2
 1 + max (depth (snd x)) (depth (snd (maxDepthPair xs)))
 = based on case 2
-
 1 + depth (snd (maxDepthPair xs))
-
 = I.H.
 1 + length (longestPath (snd (maxDepthPair xs)))
 = f
@@ -212,15 +212,15 @@ length (longestPath (YamlTree (x:xs)))
 = p
 length . longestPath (YamlTree (x:xs))
 ---------------------------------------------------------
-proof of i2 on induction:
-depth (snd (maxDepthPair xs)) = maximum (map (depth.snd) xs)
+proof of i2 with induction:
+Claim: depth (snd (maxDepthPair xs)) = maximum (map (depth.snd) xs)
 
 base case:
 depth (snd (maxDepthPair [x]))
 = g
-
 depth (snd x)
 
+depth (snd x)
 = j
 maximum ((depth.snd) x : [])
 = l
@@ -229,37 +229,33 @@ maximum ((depth.snd) x : map (depth.snd) [])
 maximum (map (depth.snd) [x])
 
 Induction hypothesis:
-depth (snd (maxDepthPair xs)) = maximum (map (depth.snd) xs)
+depth (snd (maxDepthPair ys)) = maximum (map (depth.snd) ys) -- (I.H.)
 
 Inductive case:
-depth (snd (maxDepthPair (x:xs))) = maximum (map (depth.snd) (x:xs))
+depth (snd (maxDepthPair (z:zs))) = maximum (map (depth.snd) (z:zs))
 
-case 1: depth (snd x) >= depth (snd (maxDepthPair xs))
-depth (snd (maxDepthPair (x:xs)))
+case 1: depth (snd z) >= depth (snd (maxDepthPair zs))
+depth (snd (maxDepthPair (z:zs)))
 = h
-
-depth (snd x)
-
+depth (snd z)
 = based on case 1
-max ((depth.snd) x) (depth (snd (maxDepthPair xs)))
+max ((depth.snd) z) (depth (snd (maxDepthPair zs)))
 = I.H.
-max ((depth.snd) x) (maximum (map (depth.snd) xs))
+max ((depth.snd) z) (maximum (map (depth.snd) zs))
 = k
-maximum((depth.snd) x : map (depth.snd) xs)
+maximum((depth.snd) z : map (depth.snd) zs)
 = m
-maximum (map (depth.snd) (x:xs))
+maximum (map (depth.snd) (z:zs))
 
-case 2: depth (snd x) < depth (snd (maxDepthPair xs))
-depth (snd (maxDepthPair (x:xs)))
+case 2: depth (snd z) < depth (snd (maxDepthPair zs))
+depth (snd (maxDepthPair (z:zs)))
 = i
-
-depth (snd (maxDepthPair xs))
-
+depth (snd (maxDepthPair zs))
 = based on case 2
-max ((depth.snd) x) (depth (snd (maxDepthPair xs)))
+max ((depth.snd) z) (depth (snd (maxDepthPair zs)))
 = I.H.
-max ((depth.snd) x) (maximum (map (depth.snd) xs))
+max ((depth.snd) z) (maximum (map (depth.snd) zs))
 = k
-maximum((depth.snd) x : map (depth.snd) xs)
+maximum((depth.snd) z : map (depth.snd) zs)
 = m
-maximum (map (depth.snd) (x:xs))
+maximum (map (depth.snd) (z:zs))
