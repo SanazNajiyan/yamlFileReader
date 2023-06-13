@@ -113,14 +113,14 @@ Please give a formal equational reasoning proof showing that
 length . longestPath = depth
 
 The proof should take the shape of a series of chained-together equalities of Haskell programs. Each equality should be justified by either the letter of a definition (such as (m) for definition clause 2 of map) or should be marked as (I.H.) if it follows from the use of an induction hypothesis. Every induction hypothesis should be clearly stated
+
 Claim: for all YamlTrees t, (length . longestPath) t = depth t
 Proof:
-We distinguish the cases where t = Leaf and t = YamlTree xs
+We distinguish the cases where t = Leaf and t = YamlTree (x:xs)
 
-Case t = Leaf 
-If t is a leaf, it is of shape : YamlTree [("st", YamlTree [])]
+base case: Leaf =  YamlTree [("st", YamlTree [])]
 
-length . longestPath ( YamlTree [("st", YamlTree [])] )
+length . longestPath (YamlTree [("st", YamlTree [])])
 = p
 length (longestPath ( YamlTree [("st", YamlTree [])] ))
 = d
@@ -135,8 +135,6 @@ length ("st" : [])
 1 + length []
 = e
 1 + 0 = 1
-
-1 + 0 = 1
 = j
 1 + maximum (0:[])
 = a
@@ -148,19 +146,17 @@ length ("st" : [])
 = b
 depth $ YamlTree [("st", YamlTree [])]    
 
-Case t = YamlTree (x:xs) which is of shape:
-YamlTree [("st", YamlTree xs')] 
 
-We assume the Induction Hypotheses where t' = YamlTree ys
+Induction step: t = YamlTree (x:xs)
+We assume the IH: t' = YamlTree ys
 length . longestPath (YamlTree ys) = depth (YamlTree ys) -- (I.H.)
-
-this is also of shape:
+this is of shape:
 length . longestPath YamlTree [("st", YamlTree ys')] 
 = depth (YamlTree [("st", YamlTree ys')]) 
 
 To prove our inductive case, we split our proof in to distinctive but complement cases.
 
-Case 1: depth (snd x) >= depth (snd (maxDepthPair xs))
+Case 1: Assumption - depth (snd x) >= depth (snd (maxDepthPair xs))
 
 depth (YamlTree (x:xs))
 = b 
@@ -171,7 +167,7 @@ depth (YamlTree (x:xs))
 1+ max (depth (snd x)) (maximum (map (depth (snd xs))))
 = i2
 1 + max (depth (snd x)) (depth (snd (maxDepthPair xs)))
-= based on case 1
+= based on Case 1
 1 + depth (snd x)
 = I.H.
 1 + length (longestPath (snd x))
@@ -186,7 +182,7 @@ length (longestPath (YamlTree (x:xs)))
 = p
 length . longestPath (YamlTree (x:xs))
 
-Case 2: depth (snd x) < depth (snd (maxDepthPair xs))
+Case 2: Assumption - depth (snd x) < depth (snd (maxDepthPair xs))
 
 depth (YamlTree (x:xs))
 = b 
@@ -197,7 +193,7 @@ depth (YamlTree (x:xs))
 1+ max (depth (snd x)) (maximum (map (depth (snd xs))))
 = i2
 1 + max (depth (snd x)) (depth (snd (maxDepthPair xs)))
-= based on case 2
+= based on Case 2
 1 + depth (snd (maxDepthPair xs))
 = I.H.
 1 + length (longestPath (snd (maxDepthPair xs)))
@@ -211,8 +207,8 @@ length (let (k, v) = maxDepthPair (x:xs) in k : longestPath v )
 length (longestPath (YamlTree (x:xs)))
 = p
 length . longestPath (YamlTree (x:xs))
----------------------------------------------------------
-proof of i2 with induction:
+------------------------------------------------------------------------------------
+Proof of i2 with induction:
 Claim: depth (snd (maxDepthPair xs)) = maximum (map (depth.snd) xs)
 
 base case:
