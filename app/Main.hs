@@ -44,9 +44,6 @@ import Debug.Trace (trace)
 import Data.List.Split (splitOn)
 
 
-
---We (recursively) call a YamlTree regular if all of its (proper) subtrees have the same depth and are regular themselves. Please implement a QuickCheck test that checks whether a YamlTree is regular.
-
 data YamlTree = YamlTree [(String, YamlTree)]
     deriving (Ord, Eq, Show, Generic)
 
