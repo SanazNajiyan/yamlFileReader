@@ -314,14 +314,6 @@ userWeightRequest :: YamlTree -> IO WYTree
 userWeightRequest yamlTree@(YamlTree cs) = normalizeWeights 1.0 yamlTree
 
 
---The function is introduced to check whether all the leaf nodes in a nested tree structure have the same depth
---just the immediate subtrees of level i returns True
-isEqualWeightNested :: [[String]] -> IO Bool
-isEqualWeightNested [] = return True
-isEqualWeightNested treeStrings
-  | any (\x -> length x /= length (head treeStrings)) treeStrings = return False
-  | otherwise = return $ all (\x -> x == head treeStrings) treeStrings
-
 promptForWeights :: [String] -> IO [Float]
 promptForWeights parents = do
  -- putStrLn $ "Please specify relative weight of each parent:"
@@ -386,7 +378,6 @@ normalizeWeights parentWeight (YamlTree cs) =
         putStrLn $ "Equal weighting \"" ++ L.intercalate " : " (map fst cs) ++ "\"!"
         let subTrees = map snd cs
         let treeStrings = map (map fst . treeToList . snd) cs
-        equalNested <- isEqualWeightNested treeStrings
         let weight = parentWeight / fromIntegral (length cs)
         subtrees <- mapM (\(name, yamlTree) -> normalizeWeights weight yamlTree) cs
         return $ WYTree $ zipWith (\((n, _), ts) t -> (n, weight, t)) (zip cs treeStrings) subtrees
@@ -394,7 +385,6 @@ normalizeWeights parentWeight (YamlTree cs) =
       putStrLn $ "Not equal weighting \"" ++ L.intercalate " : " (map fst cs) ++ "\"!"
       weights <- promptForWeights (map fst cs)
       let treeStrings = map (map fst . treeToList . snd) cs
-      equalNested <- isEqualWeightNested treeStrings
       let totalWeight = sum weights
       let normalized = map (\x -> (x / totalWeight) * parentWeight) weights
       subtrees <- mapM (\((name, yamlTree), weight) -> do
