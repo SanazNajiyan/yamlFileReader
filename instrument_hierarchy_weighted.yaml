@@ -1,61 +1,61 @@
 instrument_weights:
-##    bonds: 0.20/instruments  
-##        long-bonds: 0.07/instruments - 0.33/bonds
-##            us-long-bonds: 0.02/instruments - 0.11/bonds - 0.33/long-bonds
-                  US10: 0.01 ## 0.04/bonds - 0.11/long-bonds - 0.33/us-long-bonds
-                  US20: 0.01 ## 0.04/bonds - 0.11/long-bonds - 0.33/us-long-bonds
-                  US30: 0.01 ## 0.04/bonds - 0.11/long-bonds - 0.33/us-long-bonds
-##            KR10: 0.02/instruments - 0.11/bonds - 0.33/long-bonds
-                  KR10: 0.02 ## 0.11/bonds - 0.33/long-bonds - 1.00/KR10
-##            eu-short-bonds: 0.02/instruments - 0.11/bonds - 0.33/long-bonds
-                  OAT: 0.01 ## 0.06/bonds - 0.17/long-bonds - 0.50/eu-short-bonds
-                  BTP: 0.01 ## 0.06/bonds - 0.17/long-bonds - 0.50/eu-short-bonds
-##        short-bonds: 0.07/instruments - 0.33/bonds
-##            us-short-bonds: 0.02/instruments - 0.11/bonds - 0.33/short-bonds
-                  US2: 0.01 ## 0.04/bonds - 0.11/short-bonds - 0.33/us-short-bonds
-                  US3: 0.01 ## 0.04/bonds - 0.11/short-bonds - 0.33/us-short-bonds
-                  US5: 0.01 ## 0.04/bonds - 0.11/short-bonds - 0.33/us-short-bonds
-##            eu-short-bonds: 0.02/instruments - 0.11/bonds - 0.33/short-bonds
-                  SHATZ: 0.01 ## 0.06/bonds - 0.17/short-bonds - 0.50/eu-short-bonds
-                  BTP3: 0.01 ## 0.06/bonds - 0.17/short-bonds - 0.50/eu-short-bonds
-##            KR3: 0.02/instruments - 0.11/bonds - 0.33/short-bonds
-                  KR3: 0.02 ## 0.11/bonds - 0.33/short-bonds - 1.00/KR3
-##        STIRs: 0.07/instruments - 0.33/bonds
-##            STIRs: 0.07/instruments - 0.33/bonds - 1.00/STIRs
-                  EURIBOR: 0.03 ## 0.17/bonds - 0.50/STIRs - 0.50/STIRs
-                  FED: 0.03 ## 0.17/bonds - 0.50/STIRs - 0.50/STIRs
-##    energies: 0.20/instruments  
-##        energies: 0.20/instruments - 1.00/energies
-##            oil: 0.10/instruments - 0.50/energies - 0.50/energies
-                  CRUDE_W_mini: 0.02 ## 0.12/energies - 0.12/energies - 0.25/oil
-                  BRENT-LAST: 0.02 ## 0.12/energies - 0.12/energies - 0.25/oil
-                  HEATOIL: 0.02 ## 0.12/energies - 0.12/energies - 0.25/oil
-                  GASOILINE: 0.02 ## 0.12/energies - 0.12/energies - 0.25/oil
-##            gas: 0.10/instruments - 0.50/energies - 0.50/energies
-                  GAS_US_mini: 0.05 ## 0.25/energies - 0.25/energies - 0.50/gas
-                  GAS-LAST: 0.05 ## 0.25/energies - 0.25/energies - 0.50/gas
-##    currencies: 0.20/instruments  
-##        currencies: 0.20/instruments - 1.00/currencies
-##            usd-fx: 0.10/instruments - 0.50/currencies - 0.50/currencies
-                  INR-SGX: 0.03 ## 0.17/currencies - 0.17/currencies - 0.33/usd-fx
-                  EUR: 0.03 ## 0.17/currencies - 0.17/currencies - 0.33/usd-fx
-                  GBP: 0.03 ## 0.17/currencies - 0.17/currencies - 0.33/usd-fx
-##            eur-fx: 0.10/instruments - 0.50/currencies - 0.50/currencies
-                  EUR: 0.05 ## 0.25/currencies - 0.25/currencies - 0.50/eur-fx
-                  EURGBP: 0.05 ## 0.25/currencies - 0.25/currencies - 0.50/eur-fx
-##    equities: 0.20/instruments  
-##        equities: 0.20/instruments - 1.00/equities
-##            us-equities: 0.07/instruments - 0.33/equities - 0.33/equities
-                  SP500_mini: 0.03 ## 0.17/equities - 0.17/equities - 0.50/us-equities
-                  R1000: 0.03 ## 0.17/equities - 0.17/equities - 0.50/us-equities
-##            eu-equities: 0.07/instruments - 0.33/equities - 0.33/equities
-                  AEX: 0.03 ## 0.17/equities - 0.17/equities - 0.50/eu-equities
-                  DAX: 0.03 ## 0.17/equities - 0.17/equities - 0.50/eu-equities
-##            asia-equities: 0.07/instruments - 0.33/equities - 0.33/equities
-                  KOSPI: 0.07 ## 0.33/equities - 0.33/equities - 1.00/asia-equities
-##    vol: 0.20/instruments  
-##        vol: 0.20/instruments - 1.00/vol
-##            vol: 0.20/instruments - 1.00/vol - 1.00/vol
-                  VIX: 0.07 ## 0.33/vol - 0.33/vol - 0.33/vol
-                  V2X: 0.07 ## 0.33/vol - 0.33/vol - 0.33/vol
-                  VNKI: 0.07 ## 0.33/vol - 0.33/vol - 0.33/vol
+##    bonds: 0.2000/instruments  
+##        long-bonds: 0.0667/instruments - 0.3333/bonds
+##            us-long-bonds: 0.0222/instruments - 0.1111/bonds - 0.3333/long-bonds
+                  US10: 0.0074 ## 0.0370/bonds - 0.1111/long-bonds - 0.3333/us-long-bonds
+                  US20: 0.0074 ## 0.0370/bonds - 0.1111/long-bonds - 0.3333/us-long-bonds
+                  US30: 0.0074 ## 0.0370/bonds - 0.1111/long-bonds - 0.3333/us-long-bonds
+##            KR10: 0.0222/instruments - 0.1111/bonds - 0.3333/long-bonds
+                  KR10: 0.0222 ## 0.1111/bonds - 0.3333/long-bonds - 1.0000/KR10
+##            eu-short-bonds: 0.0222/instruments - 0.1111/bonds - 0.3333/long-bonds
+                  OAT: 0.0111 ## 0.0556/bonds - 0.1667/long-bonds - 0.5000/eu-short-bonds
+                  BTP: 0.0111 ## 0.0556/bonds - 0.1667/long-bonds - 0.5000/eu-short-bonds
+##        short-bonds: 0.0667/instruments - 0.3333/bonds
+##            us-short-bonds: 0.0222/instruments - 0.1111/bonds - 0.3333/short-bonds
+                  US2: 0.0074 ## 0.0370/bonds - 0.1111/short-bonds - 0.3333/us-short-bonds
+                  US3: 0.0074 ## 0.0370/bonds - 0.1111/short-bonds - 0.3333/us-short-bonds
+                  US5: 0.0074 ## 0.0370/bonds - 0.1111/short-bonds - 0.3333/us-short-bonds
+##            eu-short-bonds: 0.0222/instruments - 0.1111/bonds - 0.3333/short-bonds
+                  SHATZ: 0.0111 ## 0.0556/bonds - 0.1667/short-bonds - 0.5000/eu-short-bonds
+                  BTP3: 0.0111 ## 0.0556/bonds - 0.1667/short-bonds - 0.5000/eu-short-bonds
+##            KR3: 0.0222/instruments - 0.1111/bonds - 0.3333/short-bonds
+                  KR3: 0.0222 ## 0.1111/bonds - 0.3333/short-bonds - 1.0000/KR3
+##        STIRs: 0.0667/instruments - 0.3333/bonds
+##            STIRs: 0.0667/instruments - 0.3333/bonds - 1.0000/STIRs
+                  EURIBOR: 0.0333 ## 0.1667/bonds - 0.5000/STIRs - 0.5000/STIRs
+                  FED: 0.0333 ## 0.1667/bonds - 0.5000/STIRs - 0.5000/STIRs
+##    energies: 0.2000/instruments  
+##        energies: 0.2000/instruments - 1.0000/energies
+##            oil: 0.1000/instruments - 0.5000/energies - 0.5000/energies
+                  CRUDE_W_mini: 0.0250 ## 0.1250/energies - 0.1250/energies - 0.2500/oil
+                  BRENT-LAST: 0.0250 ## 0.1250/energies - 0.1250/energies - 0.2500/oil
+                  HEATOIL: 0.0250 ## 0.1250/energies - 0.1250/energies - 0.2500/oil
+                  GASOILINE: 0.0250 ## 0.1250/energies - 0.1250/energies - 0.2500/oil
+##            gas: 0.1000/instruments - 0.5000/energies - 0.5000/energies
+                  GAS_US_mini: 0.0500 ## 0.2500/energies - 0.2500/energies - 0.5000/gas
+                  GAS-LAST: 0.0500 ## 0.2500/energies - 0.2500/energies - 0.5000/gas
+##    currencies: 0.2000/instruments  
+##        currencies: 0.2000/instruments - 1.0000/currencies
+##            usd-fx: 0.1000/instruments - 0.5000/currencies - 0.5000/currencies
+                  INR-SGX: 0.0333 ## 0.1667/currencies - 0.1667/currencies - 0.3333/usd-fx
+                  EUR: 0.0333 ## 0.1667/currencies - 0.1667/currencies - 0.3333/usd-fx
+                  GBP: 0.0333 ## 0.1667/currencies - 0.1667/currencies - 0.3333/usd-fx
+##            eur-fx: 0.1000/instruments - 0.5000/currencies - 0.5000/currencies
+                  EUR: 0.0500 ## 0.2500/currencies - 0.2500/currencies - 0.5000/eur-fx
+                  EURGBP: 0.0500 ## 0.2500/currencies - 0.2500/currencies - 0.5000/eur-fx
+##    equities: 0.2000/instruments  
+##        equities: 0.2000/instruments - 1.0000/equities
+##            us-equities: 0.0667/instruments - 0.3333/equities - 0.3333/equities
+                  SP500_mini: 0.0333 ## 0.1667/equities - 0.1667/equities - 0.5000/us-equities
+                  R1000: 0.0333 ## 0.1667/equities - 0.1667/equities - 0.5000/us-equities
+##            eu-equities: 0.0667/instruments - 0.3333/equities - 0.3333/equities
+                  AEX: 0.0333 ## 0.1667/equities - 0.1667/equities - 0.5000/eu-equities
+                  DAX: 0.0333 ## 0.1667/equities - 0.1667/equities - 0.5000/eu-equities
+##            asia-equities: 0.0667/instruments - 0.3333/equities - 0.3333/equities
+                  KOSPI: 0.0667 ## 0.3333/equities - 0.3333/equities - 1.0000/asia-equities
+##    vol: 0.2000/instruments  
+##        vol: 0.2000/instruments - 1.0000/vol
+##            vol: 0.2000/instruments - 1.0000/vol - 1.0000/vol
+                  VIX: 0.0667 ## 0.3333/vol - 0.3333/vol - 0.3333/vol
+                  V2X: 0.0667 ## 0.3333/vol - 0.3333/vol - 0.3333/vol
+                  VNKI: 0.0667 ## 0.3333/vol - 0.3333/vol - 0.3333/vol
