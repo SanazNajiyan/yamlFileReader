@@ -421,7 +421,7 @@ wyTreePrint (name, weight, (WYTree ts)) parents =
     concatMap (\tr -> wyTreePrint tr (parents ++ [(name, weight)])) ts
 
 formatFloat :: Float -> String
-formatFloat f = printf "%.2f" f
+formatFloat f = printf "%.4f" f
 
 
 portions :: [(String, Float)] -> Float -> [String]
