@@ -367,36 +367,7 @@ isEqualWeight parents = do
     "no" -> return False
     _ -> return True
 
--- YamlTree [(String, YamlTree [])] this is leaf
--- normalizeWeights :: Float -> YamlTree -> IO WYTree
--- normalizeWeights _ (YamlTree []) = return (WYTree [])
--- normalizeWeights x (YamlTree [(y, YamlTree [])]) = return (WYTree [(y, x, WYTree [])])
--- normalizeWeights parentWeight (YamlTree cs) = do
---   equal <- isEqualWeight (map fst cs)
---   if equal
---     then do
---       putStrLn $ "Equal weighting \"" ++ L.intercalate " : " (map fst cs) ++ "\"!"
---       let subTrees = map snd cs
---       let treeStrings = map (map fst . treeToList . snd) cs
---       equalNested <- isEqualWeightNested treeStrings
---       let weight = parentWeight / fromIntegral (length cs)
---       subtrees <- mapM (\(name, yamlTree) -> normalizeWeights weight yamlTree) cs
---       return $ WYTree $ zipWith (\((n, _), ts) t -> (n, weight, t)) (zip cs treeStrings) subtrees
---     else if length cs == 1
---            then do
---              putStrLn $ "Category \"" ++ (fst $ head cs) ++ "\" only has a single option, so no weighting decision to make!"
---              return $ WYTree [(fst $ head cs, parentWeight, WYTree [])]
---            else do
---              putStrLn $ "Not equal weighting \"" ++ L.intercalate " : " (map fst cs) ++ "\"!"
---              weights <- promptForWeights (map fst cs)
---              let treeStrings = map (map fst . treeToList . snd) cs
---              equalNested <- isEqualWeightNested treeStrings
---              let totalWeight = sum weights
---              let normalized = map (\x -> (x / totalWeight) * parentWeight) weights
---              subtrees <- mapM (\((name, yamlTree), weight) -> do
---                wyTree <- normalizeWeights weight yamlTree
---                return (name, weight, wyTree)) (zip cs normalized)
---              return (WYTree subtrees)
+
 normalizeWeights :: Float -> YamlTree -> IO WYTree
 normalizeWeights _ (YamlTree []) = return (WYTree [])
 normalizeWeights x (YamlTree [(y, YamlTree [])]) = return (WYTree [(y, x, WYTree [])])
