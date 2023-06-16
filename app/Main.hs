@@ -7,6 +7,7 @@ import Data.List (isPrefixOf)
 import Data.List.Split as L
 import Data.Function (on)
 import Control.Monad as M (void)
+import Control.Monad as M (zipWithM)
 import System.IO (hFlush, stdout)
 import Control.Monad as M (guard)
 import qualified Test.QuickCheck as Q
@@ -358,7 +359,41 @@ isEqualWeight parents = do
     "n" -> return False
     "no" -> return False
     _ -> return True
+  
+    
+    
 
+-- normalizeWeights :: Float -> YamlTree -> IO WYTree
+-- normalizeWeights _ (YamlTree []) = return (WYTree [])
+-- normalizeWeights x (YamlTree [(y, YamlTree [])]) = return (WYTree [(y, x, WYTree [])])
+-- normalizeWeights parentWeight (YamlTree cs) =
+--   if length cs == 1
+--     then do
+--       putStrLn $ "Category \"" ++ (fst $ head cs) ++ "\" only has a single option, so no weighting decision to make!"
+--       return $ WYTree [(fst $ head cs, parentWeight, WYTree [])]
+--       let treeStrings = map (map fst . treeToList . snd) cs
+--       subtrees <- mapM (\(name, yamlTree) -> normalizeWeights parentWeight yamlTree) cs
+--       return $ WYTree $ zipWith (\((n, _), ts) t -> (n, parentWeight, t)) (zip cs treeStrings) subtrees
+--   else do
+--     equal <- isEqualWeight (map fst cs)
+--     if equal
+--       then do
+--         putStrLn $ "Equal weighting \"" ++ L.intercalate " : " (map fst cs) ++ "\"!"
+--         let subTrees = map snd cs
+--         let treeStrings = map (map fst . treeToList . snd) cs
+--         let weight = parentWeight / fromIntegral (length cs)
+--         subtrees <- mapM (\(name, yamlTree) -> normalizeWeights weight yamlTree) cs
+--         return $ WYTree $ zipWith (\((n, _), ts) t -> (n, weight, t)) (zip cs treeStrings) subtrees
+--     else do
+--       putStrLn $ "Not equal weighting \"" ++ L.intercalate " : " (map fst cs) ++ "\"!"
+--       weights <- promptForWeights (map fst cs)
+--       let treeStrings = map (map fst . treeToList . snd) cs
+--       let totalWeight = sum weights
+--       let normalized = map (\x -> (x / totalWeight) * parentWeight) weights
+--       subtrees <- mapM (\((name, yamlTree), weight) -> do
+--         wyTree <- normalizeWeights weight yamlTree
+--         return (name, weight, wyTree)) (zip cs normalized)
+--       return (WYTree subtrees)
 
 normalizeWeights :: Float -> YamlTree -> IO WYTree
 normalizeWeights _ (YamlTree []) = return (WYTree [])
@@ -386,11 +421,15 @@ normalizeWeights parentWeight (YamlTree cs) =
       weights <- promptForWeights (map fst cs)
       let treeStrings = map (map fst . treeToList . snd) cs
       let totalWeight = sum weights
-      let normalized = map (\x -> (x / totalWeight) * parentWeight) weights
+      let normalized = reverse $ map (\x -> (x / totalWeight) * parentWeight) weights
       subtrees <- mapM (\((name, yamlTree), weight) -> do
         wyTree <- normalizeWeights weight yamlTree
         return (name, weight, wyTree)) (zip cs normalized)
       return (WYTree subtrees)
+
+
+
+
 --12. code is wrong: you are missing a reverse; also leaf weights do not work; have you tested this?
 
 --q13:Now, please write a pretty printer for WeightedYamlTrees that produces
