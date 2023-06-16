@@ -180,7 +180,7 @@ length (let (k, v) = maxDepthPair (x:xs) in k : longestPath v )
 = d
 length (longestPath (YamlTree (x:xs)))
 = p
-length . longestPath (YamlTree (x:xs))
+(length . longestPath) (YamlTree (x:xs))
 
 Case 2: Assumption - depth (snd x) < depth (snd (maxDepthPair xs))
 
@@ -206,7 +206,7 @@ length (let (k, v) = maxDepthPair (x:xs) in k : longestPath v )
 = d
 length (longestPath (YamlTree (x:xs)))
 = p
-length . longestPath (YamlTree (x:xs))
+(length . longestPath) (YamlTree (x:xs))
 ------------------------------------------------------------------------------------
 Proof of i2 with induction:
 Claim: depth (snd (maxDepthPair xs)) = maximum (map (depth.snd) xs)
