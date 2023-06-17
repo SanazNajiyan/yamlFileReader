@@ -1,0 +1,12 @@
+currencies:
+    usd-fx:
+        INR-SGX
+        EUR
+        GBP
+    eur-fx:
+        EUR
+        EURGBP
+equities:
+    us-equities:
+        SP500_mini
+        R1000
