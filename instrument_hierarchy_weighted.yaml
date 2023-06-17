@@ -1,7 +1,5 @@
 instrument_weights:
-##    bonds: 1.0000/instruments  
-##        long-bonds: 1.0000/instruments - 1.0000/bonds
-##            us-long-bonds: 1.0000/instruments - 1.0000/bonds - 1.0000/long-bonds
-                  US10: 0.0090 ## 0.0090/bonds - 0.0090/long-bonds - 0.0090/us-long-bonds
-                  US20: 0.0901 ## 0.0901/bonds - 0.0901/long-bonds - 0.0901/us-long-bonds
-                  US30: 0.9009 ## 0.9009/bonds - 0.9009/long-bonds - 0.9009/us-long-bonds
+##    vol: 1.0000/instruments  
+          VIX: 0.8333 ## 0.8333/vol
+          V2X: 0.0833 ## 0.0833/vol
+          VNKI: 0.0833 ## 0.0833/vol
