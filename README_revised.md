@@ -116,8 +116,8 @@ The proof should take the shape of a series of chained-together equalities of Ha
 
 Claim: for all YamlTrees t, (length . longestPath) t = depth t
 Proof:
-BASE CASE: the smallest YamlTree is an Empty YamlTree which is YamlTree []
-depth (YamlTree []) = (length . longestPath) (YamlTree [])
+We will prove this claim using structural induction on the YamlTree t
+Base Case:  Consider the smallest YamlTree, which is an empty YamlTree: YamlTree []
 depth (YamlTree [])  
 = a
 0
@@ -130,10 +130,12 @@ length []
 length (longestPath (YamlTree []))
 = p
 (length . longestPath) (YamlTree [])
-INDUCTIVE CASE: 
-YamlTree is not a binary tree. It can have n children therefore we assume that for each child the Induction Hypothesis holds.
-suppose xs = [(n_1, t_1), (n_2, t_2), ..., (n_n, t_n)]
-Therefore, we assume n Induction Hypothesis:
+Thus the claim holds for the Base Case
+
+Inductive Case: 
+Assume the claim holds for all YamlTrees with fewer nodes than the YamlTree xs.
+Let xs = [(n_1, t_1), (n_2, t_2), ..., (n_n, t_n)] be a list of pairs representing the children of the YamlTree xs.
+Therefore, we assume n Induction Hypothesis so for each child one Induction Hypothesis as follows:
 IH_1: (length . longestPath) t_1 = depth t_1
 IH_2: (length . longestPath) t_2 = depth t_2
 ...
@@ -141,39 +143,48 @@ IH_n: (length . longestPath) t_n = depth t_n
 
 We now need to prove this: 
 (length . longestPath) (YamlTree xs) = depth (YamlTree xs)
+
 Proof: 
 depth (YamlTree xs)
-= Inductive Case
+= substituting xs
 depth (YamlTree [(n_1, t_1), (n_2, t_2), ..., (n_n, t_n)])
 = lists
-depth (YamlTree ((n_1, t_1) : nts))
+depth (YamlTree ((n_1, t_1) : [(n_2, t_2), ..., (n_n, t_n)]))
 = b
-1 + maximum ((depth . snd) (n_1, t_1) : map (depth . snd) nts)
+1 + maximum ((depth . snd) (n_1, t_1) : map (depth . snd) [(n_2, t_2), ..., (n_n, t_n)])
 = p
-1 + maximum (depth (snd (n_1, t_1)) : map (depth . snd) nts)
+1 + maximum (depth (snd (n_1, t_1)) : map (depth (snd [(n_2, t_2), ..., (n_n, t_n)])))
 = n
-1 + maximum ((depth t_1) : map (depth . snd) nts)
+1 + maximum ((depth t_1) : map (depth [t_2, t_3,..., t_n]))
+= simpler
+1 + maximum ((depth t_1) : map depth [t_2, t_3,..., t_n])
+= m
+1 + maximum ((depth t_1) : (depth t_2 : map depth [t_3,..., t_n]))
+= m 
+1 + maximum (depth t_1 : [depth t_2, ..., ((depth t_n): map depth t_n []])])
+= l
+1 + maximum (depth t_1 : [depth t_2, ..., depth t_n])
 = k
-1 + max (depth t_1) (maximum (map (depth . snd) nts))
-= i2
-1 + max (depth t_1) (depth (snd (maxDepthPair nts)))
-= here we need to assume two case here to use Lemma o. 
-Case 1 : We assume that depth t_1 > depth (snd (maxDepthPair nts))
+1 + max (depth t_1) (maximum [depth t_2, ..., depth t_n]) *
+= here we need to assume 2 cases to apply o
+Case 1 : We assume that depth t_1 > maximum [depth t_2, ..., depth t_n]
 = o
 1 + depth t_1
 = IH_1
 1 + (length . longestPath) t_1
 
-Case 2: We assume that depth t_1 < depth (snd (maxDepthPair nts))
+Case 2: We assume that depth t_1 <= maximum [depth t_2, ..., depth t_n]
 = o
-1 + maximum (map (depth . snd) nts)
+1 + maximum [depth t_2, ..., depth t_n]
+= n
+1 + maximum (map (depth . snd) [(n_2, t_2), ..., (n_n, t_n)])
 = i2
-1 + depth (snd (maxDepthPair nts))
-= list
-1 + depth (snd (maxDepthPair ((n_2, t_2) : nts))) *
-= we need to assume two cases to use lemmas h or i
+1 + depth (snd (maxDepthPair [(n_2, t_2), ..., (n_n, t_n)]))
+= list 
+1 + depth (snd (maxDepthPair ((n_2, t_2):[(n_3, t_3), ..., (n_n, t_n)])))
+= here we need to assume 2 cases in order to use the rules for maxDepthPair
 
-Case 2A: We assume that depth (snd (n_2, t_2)) >= depth (snd (maxDepthPair nts))
+Case 2A: we assume that depth (snd (n_2, t_2)) >= depth (snd (maxDepthPair [(n_3, t_3), ..., (n_n, t_n)]))
 = h
 1 + depth (snd (n_2, t_2)) 
 = n
@@ -181,21 +192,38 @@ Case 2A: We assume that depth (snd (n_2, t_2)) >= depth (snd (maxDepthPair nts))
 = IH_2
 1 + (length . longestPath) t_2 
 
-Case 2B: We assume that depth (snd (n_2, t_2)) < depth (snd (maxDepthPair nts))
+Case 2B: we assume that depth (snd (n_2, t_2)) < depth (snd (maxDepthPair [(n_3, t_3), ..., (n_n, t_n)]))
 = i
-1 + depth (maxDepthPair nts)
-= list format
-1 + depth (maxDepthPair ((n_3, t_3): nts))
-= referring to Case 2A and repeating the same pattern we can conclude that 
-1+ depth (snd (n_3, t_3))
+1 + depth (snd (maxDepthPair [(n_3, t_3), ..., (n_n, t_n)]))
+= i2 
+1 + maximum (map (depth.snd) [(n_3, t_3), ..., (n_n, t_n)]) **
+= list
+1 + maximum (map (depth.snd) ((n_3, t_3): [(n_4, t_4), ..., (n_n, t_n)]))
+= m
+1 + maximum ((depth.snd) (n_3, t_3) : map (depth.snd) [(n_4, t_4), ..., (n_n, t_n)]) 
+= k
+1 + max ((depth.snd) (n_3, t_3)) (maximum (map (depth.snd) [(n_4, t_4), ..., (n_n, t_n)]))
+= like above (*) we need to assume two cases for max
+
+Case 2Ba: we assume that (depth.snd) (n_3, t_3) > maximum (map (depth.snd) [(n_4, t_4), ..., (n_n, t_n)])
+= o
+1 + (depth.snd) (n_3, t_3)
+= p
+1 + depth (snd (n_3, t_3))
 = n
-1 + depth t_2
+1 + depth t_3
 = IH_3
-1 + (length . longestPath) t_2
-Or referring to Case 2B again and extracting the list until we find the maxDepthPair in the first tuple and use the IH_i to prove the equation.
+1 + (length . longestPath) t_3
 
+Case 2Bb: we assume that (depth.snd) (n_3, t_3) <= maximum (map (depth.snd) [(n_4, t_4), ..., (n_n, t_n)])
+= o 
+1 + maximum (map (depth.snd) [(n_4, t_4), ..., (n_n, t_n)])
+= referring to ** and repeating the same pattern of proof 
+By following the same pattern of proof and considering the two cases for maxDepthPair, we can eventually prove:
 
+(length . longestPath) (YamlTree xs) = depth (YamlTree xs)
 
+Therefore, we have proven that for all YamlTrees t, (length . longestPath) t = depth t.
 
 
 
