@@ -324,7 +324,7 @@ promptForWeights parents = do
         let totalWeight = sum accum
         if totalWeight > 0
           then do
-            let normalized = map (/ totalWeight) accum
+            let normalized = reverse $ map (/ totalWeight) accum
             let normalizedStr = L.intercalate " : " (map (printf "%.2f") normalized)
             putStrLn $ "Your chosen weights sum to \"" ++ show totalWeight ++ "\". Normalizing to \"1\" gives relative weights of \"" ++ normalizedStr ++ "\" for \"" ++ L.intercalate " : " parents ++ "\"!"
             return normalized
@@ -421,7 +421,7 @@ normalizeWeights parentWeight (YamlTree cs) =
       weights <- promptForWeights (map fst cs)
       let treeStrings = map (map fst . treeToList . snd) cs
       let totalWeight = sum weights
-      let normalized = reverse $ map (\x -> (x / totalWeight) * parentWeight) weights
+      let normalized = map (\x -> (x / totalWeight) * parentWeight) weights
       subtrees <- mapM (\((name, yamlTree), weight) -> do
         wyTree <- normalizeWeights weight yamlTree
         return (name, weight, wyTree)) (zip cs normalized)
