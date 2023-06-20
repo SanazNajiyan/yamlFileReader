@@ -494,7 +494,7 @@ main = do
     yamlValueInput <- parse path
     let yamlTree' = convertToYAMLTree yamlValueInput
     let yamlTree = postProcessYamlTree yamlTree'
-    print yamlTree
+    --print yamlTree
 -- - regularizer into a regular YamlTree, producing a YamlTree that would pretty print to "instruments-hierarchy-regular.yaml" for our particular example
     putStrLn " "
     let regularized = regularize yamlTree
