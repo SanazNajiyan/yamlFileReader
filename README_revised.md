@@ -184,28 +184,26 @@ Case 1 : We assume that depth t > maximum [depth t_1, ..., depth t_n]
 1 + (length . longestPath) t
 Therefore, by assuming Case 1 and using the induction hypothesis (IH_i), we have shown that depth (YamlTree (x:xs)) equals (length . longestPath) YamlTree (x:xs)
 
-
 Case 2: We assume that depth t <= maximum [depth t_1, ..., depth t_n]
 = o
 1 + maximum [depth t_1, ..., depth t_n]
 = n
-1 + maximum (map (depth . snd) [(n_1, t_1), ..., (n_n, t_n)])
+1 + maximum (map (depth . snd) xs)
 = i2
-1 + depth (snd (maxDepthPair [(n_1, t_1), ..., (n_n, t_n)]))
+1 + depth (snd (maxDepthPair xs))
 = list  
-1 + depth (snd (maxDepthPair ((n_1, t_1):[(n_2, t_2), ..., (n_n, t_n)])))
-= r 
-(length . longestPath) (snd (maxDepthPair ((n_1, t_1):[(n_2, t_2), ..., (n_n, t_n)])))
-
+1 + depth (snd (maxDepthPair xs))
+= r
+1 + (length . longestPath) (snd (maxDepthPair xs))
 = here we need to assume 2 cases in order to use the rules for maxDepthPair
 
 Case 2A: we assume that depth (snd (n_1, t_1)) >= depth (snd (maxDepthPair [(n_2, t_2), ..., (n_n, t_n)]))
 = h
-1 + depth (snd (n_1, t_1)) 
+1 + depth (snd (n_1, t_1))
 = n
 1 + depth t_1
 = IH_1
-1 + (length . longestPath) t_1 
+1 + (length . longestPath) t_1
 
 Case 2B: we assume that depth (snd (n_1, t_1)) < depth (snd (maxDepthPair [(n_2, t_2), ..., (n_n, t_n)]))
 = i
@@ -213,16 +211,17 @@ Case 2B: we assume that depth (snd (n_1, t_1)) < depth (snd (maxDepthPair [(n_2,
 = r
 1 + (length . longestPath) (snd (maxDepthPair[(n_2, t_2), ..., (n_n, t_n)]))
 = this will be followed again like Case 2A and applying IH_2
-
-By following the same pattern of proof and considering the two cases for maxDepthPair and applying Induction Hypotheses each time, we can eventually prove:
+Therefore we can eventually prove:
 
 (length . longestPath) (YamlTree (x:xs)) = depth (YamlTree (x:xs))
 
 Therefore, we have proven that for all YamlTrees t, (length . longestPath) t = depth t.
 
 -------------------------------------------------------------------------------------------
-Proof of r with induction:
-Claim: depth (snd (maxDepthPair (x:xs))) = (length . longestPath) (snd (maxDepthPair (x:xs)))
+Proof of Lemma r with induction:
+Claim: We assume that IH_1, IH_2...IH_n holds for any subtree in the list xs. 
+depth (snd (maxDepthPair (x:xs))) = (length . longestPath) (snd (maxDepthPair (x:xs)))
+
 
 base case: xs = []
 In this case, (x:xs) reduces to [x], where x = (n,t)
@@ -234,7 +233,6 @@ depth (snd (maxDepthPair [(n,t)]))
 depth (snd (n,t))
 = n
 depth t
-
 (length . longestPath) t
 = n
 (length . longestPath) (snd (n,t))
@@ -245,27 +243,22 @@ depth t
 Hence, in the base case, the equation holds.
 
 Inductive Case: Assume the equation holds for xs.
-Assume (length . longestPath) (snd (maxDepthPair xs)) = depth (snd (maxDepthPair xs)) -- (I.H.)
 
-We need to prove that the equation holds for (x:xs)
-
-Let xs = [(n_1, t_1), (n_2, t_2), ..., (n_n, t_n)] be a list of pairs representing the list of pairs with the wrapped by YamlTree. 
-we can assume that I.H. holds for xs as follows
-
-I.H. : (length . longestPath) (snd (maxDepthPair xs)) = depth (snd (maxDepthPair xs))
+We therefore assume this induction hypothesis:
+(length . longestPath) (snd (maxDepthPair xs)) = depth (snd (maxDepthPair xs)) -- (I.H.)
 
 and we need to prove that equation holds for (x:xs)
 
 depth (snd (maxDepthPair (x:xs))) = (length . longestPath) (snd (maxDepthPair (x:xs)))
 
-depth (snd (maxDepthPair ((n,t):[(n_1,t_1), (n_2, t_2), ...(n_n, t_n)])))
+depth (snd (maxDepthPair ((n,t):xs)))
 = We need to assume two cases where:
-Case 1 : depth (snd (n,t)) >= depth (snd (maxDepthPair [(n_1,t_1), (n_2, t_2), ...(n_n, t_n)])) 
+Case 1 : depth (snd (n,t)) >= depth (snd (maxDepthPair xs)) 
 = h
 depth (snd (n,t))
 = n
 depth t
-
+= IH_1, IH_2,.. IH_n
 (length . longestPath) t
 = n
 (length . longestPath) (snd (n,t))
@@ -276,15 +269,16 @@ Therefore, in Case 1, we have:
 
 depth (snd (maxDepthPair (x:xs))) = (length . longestPath) (snd (maxDepthPair (x:xs)))
 
-and Case 2: depth (snd (n,t)) < depth (snd (maxDepthPair [(n_1,t_1), (n_2, t_2), ...(n_n, t_n)]))
+and Case 2: depth (snd (n,t)) < depth (snd (maxDepthPair xs))
 = i
-depth (snd maxDepthPair [(n_1,t_1), (n_2, t_2), ...(n_n, t_n)])
+depth (snd maxDepthPair xs)
 = I.H.
-(length . longestPath) (snd (maxDepthPair [(n_1,t_1), (n_2, t_2), ...(n_n, t_n)]))
+(length . longestPath) (snd (maxDepthPair xs))
+= according to the assumption we made for Case 2 xs is indeed the same as (x:xs)
 
 Therefore, in Case 2, we have:
 
-depth (snd (maxDepthPair (x:xs))) = (length . longestPath) (snd (maxDepthPair xs))
+depth (snd (maxDepthPair (x:xs))) = (length . longestPath) (snd (maxDepthPair (x:xs)))
 
 Since we have covered both cases, we can conclude that in both cases, the equation holds:
 
@@ -296,7 +290,7 @@ By proving the base case and the inductive case, we have shown that the equation
 
 
 ------------------------------------------------------------------------------------
-Proof of i2 with induction:
+Proof of Lemma i2 with induction:
 Claim: depth (snd (maxDepthPair xs)) = maximum (map (depth.snd) xs)
 
 base case:
