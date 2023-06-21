@@ -188,13 +188,14 @@ Case 2: We assume that depth t <= maximum [depth t_1, ..., depth t_n]
 = o
 1 + maximum [depth t_1, ..., depth t_n]
 = n
-1 + maximum (map (depth . snd) xs)
+1 + maximum (map (depth . snd) [(n_1, t_1), ..., (n_n, t_n)])
 = i2
-1 + depth (snd (maxDepthPair xs))
+1 + depth (snd (maxDepthPair [(n_1, t_1), ..., (n_n, t_n)]))
 = list  
-1 + depth (snd (maxDepthPair xs))
+1 + depth (snd (maxDepthPair ((n_1, t_1):[(n_2, t_2), ..., (n_n, t_n)])))
 = r
-1 + (length . longestPath) (snd (maxDepthPair xs))
+1 + (length . longestPath) (snd (maxDepthPair ((n_1, t_1):[(n_2, t_2), ..., (n_n, t_n)])))
+
 = here we need to assume 2 cases in order to use the rules for maxDepthPair
 
 Case 2A: we assume that depth (snd (n_1, t_1)) >= depth (snd (maxDepthPair [(n_2, t_2), ..., (n_n, t_n)]))
