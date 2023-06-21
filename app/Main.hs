@@ -205,6 +205,8 @@ isRegular (YamlTree kvs) =
 prop_isRegular :: YamlTree -> Bool
 prop_isRegular = isRegular . regularize
 -----------q6
+
+--The provided code is an implementation of a function called "regularize" that takes a YamlTree and converts it into a regular tree structure by ensuring that all branches have the same depth. The goal is to achieve a consistent hierarchy by adding empty levels to shallower branches.
 --Write a function that "regularizes" a YamlTree into a regular one by copying levels in the hierarchy. Please ensure that this function regularizes the YamlTree implemented by "instruments-hierarchy.yaml" to the one implemented by "instruments-hierarchy-regular.yaml". (Again, we want a generally applicable solution. No hard-coding of the example allowed.)
 --the idea is to make all branches have the same depth even if it requires adding empty levels to shallower branches
 regularize :: YamlTree -> YamlTree
@@ -213,6 +215,7 @@ regularize yamlTree@(YamlTree subTrees) =
       newTrees = regularizeSubTrees maxDepth subTrees
   in YamlTree newTrees
 --This function recursively adjusts the depth of each sub-tree to match the desired maxDepth.
+--It recursively adjusts the depth of each sub-tree by calling the "regularizeSubTree" function for each sub-tree.
 regularizeSubTrees :: Int -> [(String, YamlTree)] -> [(String, YamlTree)]
 regularizeSubTrees 0 [] = []
 regularizeSubTrees 0 _  = error "Cannot shrink tree"
@@ -293,10 +296,8 @@ find' key (YamlTree ts) = any (checkKey key) ts || any (find' key . snd) ts
 
 ----------answer of the effect of laziness:
 -- find' searches the tree as far as necessary to find the node with the
--- specified label. This means that if the label is found early in the tree, the
--- function will terminate quickly, without searching the rest of the tree(early exit)
--- minimum evaluation allows for efficient searching of large trees, since it only
--- evaluates the parts of the tree that are needed to find the label.
+-- specified label.The point is that not even the whole tree needs to be
+-- computed/built before starting to search it.
 ------------------------------------------------------------------------------------
 --q12:Write an interactive (IO) program that does a depth-first traversal of a
 --YamlTree that asks the user to specify weights for each subtree to
@@ -359,41 +360,6 @@ isEqualWeight parents = do
     "n" -> return False
     "no" -> return False
     _ -> return True
-  
-    
-    
-
--- normalizeWeights :: Float -> YamlTree -> IO WYTree
--- normalizeWeights _ (YamlTree []) = return (WYTree [])
--- normalizeWeights x (YamlTree [(y, YamlTree [])]) = return (WYTree [(y, x, WYTree [])])
--- normalizeWeights parentWeight (YamlTree cs) =
---   if length cs == 1
---     then do
---       putStrLn $ "Category \"" ++ (fst $ head cs) ++ "\" only has a single option, so no weighting decision to make!"
---       return $ WYTree [(fst $ head cs, parentWeight, WYTree [])]
---       let treeStrings = map (map fst . treeToList . snd) cs
---       subtrees <- mapM (\(name, yamlTree) -> normalizeWeights parentWeight yamlTree) cs
---       return $ WYTree $ zipWith (\((n, _), ts) t -> (n, parentWeight, t)) (zip cs treeStrings) subtrees
---   else do
---     equal <- isEqualWeight (map fst cs)
---     if equal
---       then do
---         putStrLn $ "Equal weighting \"" ++ L.intercalate " : " (map fst cs) ++ "\"!"
---         let subTrees = map snd cs
---         let treeStrings = map (map fst . treeToList . snd) cs
---         let weight = parentWeight / fromIntegral (length cs)
---         subtrees <- mapM (\(name, yamlTree) -> normalizeWeights weight yamlTree) cs
---         return $ WYTree $ zipWith (\((n, _), ts) t -> (n, weight, t)) (zip cs treeStrings) subtrees
---     else do
---       putStrLn $ "Not equal weighting \"" ++ L.intercalate " : " (map fst cs) ++ "\"!"
---       weights <- promptForWeights (map fst cs)
---       let treeStrings = map (map fst . treeToList . snd) cs
---       let totalWeight = sum weights
---       let normalized = map (\x -> (x / totalWeight) * parentWeight) weights
---       subtrees <- mapM (\((name, yamlTree), weight) -> do
---         wyTree <- normalizeWeights weight yamlTree
---         return (name, weight, wyTree)) (zip cs normalized)
---       return (WYTree subtrees)
 
 normalizeWeights :: Float -> YamlTree -> IO WYTree
 normalizeWeights _ (YamlTree []) = return (WYTree [])
@@ -429,15 +395,9 @@ normalizeWeights parentWeight (YamlTree cs) =
 
 
 
-
---12. code is wrong: you are missing a reverse; also leaf weights do not work; have you tested this?
-
 --q13:Now, please write a pretty printer for WeightedYamlTrees that produces
 --"instruments_hierarchy_weighted.yaml" for the YamlTree corresponding to
 --"instruments_hierarchy_regular.yaml", for example. (Again, no hard-coding!)
-----e.g.##            us-long-bonds: 0.022/instruments - 0.11/bonds - 0.33/long-bonds
-
-
 
 wyTreePrint' :: WYTree -> String
 wyTreePrint' (WYTree x) = "instrument_weights:\n" ++ concatMap (\y -> wyTreePrint y []) x
@@ -474,6 +434,8 @@ portions ((parent, parentWeight):rest) weight =
 
 replicatePortions :: [(String, Float)] -> Float -> String
 replicatePortions ps w = L.intercalate " - " (portions ps w)
+
+
 
 --instruments-hierarchy.yaml 
 --q.14
